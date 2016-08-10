@@ -256,24 +256,56 @@ static inline hv_int32_t __hv_utils_min_i(hv_int32_t x, hv_int32_t y) { return (
 
 // Atomics
 #if HV_WIN
-#include <Windows.h>
-#define hv_atomic_bool volatile LONG
-#define HV_SPINLOCK_ACQUIRE(_x) \
-while (InterlockedCompareExchange(&_x, true, false)) { }
-#define HV_SPINLOCK_RELEASE(_x) (_x = false)
-#elif __cplusplus || __has_include(<stdatomic.h>)
-#if !__cplusplus
-#include <stdatomic.h>
-#endif
-#define hv_atomic_bool volatile atomic_bool
-#define HV_SPINLOCK_ACQUIRE(_x) \
-bool expected = false; \
-while (!atomic_compare_exchange_strong(&_x, &expected, true)) { expected = false; }
-#define HV_SPINLOCK_RELEASE(_x) atomic_store(&_x, false)
+  #include <Windows.h>
+  #define hv_atomic_bool volatile LONG
+  #define HV_SPINLOCK_ACQUIRE(_x) \
+  while (InterlockedCompareExchange(&_x, true, false)) { }
+  #define HV_SPINLOCK_TRY(_x) \
+  return !InterlockedCompareExchange(&_x, true, false);
+  #define HV_SPINLOCK_RELEASE(_x) (_x = false)
+#elif __cplusplus
+  #define hv_atomic_bool volatile atomic_bool
+  #define HV_SPINLOCK_ACQUIRE(_x) \
+  bool _expected = false; \
+  while (!atomic_compare_exchange_strong(&_x, &_expected, true)) { _expected = false; }
+  #define HV_SPINLOCK_TRY(_x) \
+  bool _expected = false; \
+  return atomic_compare_exchange_strong(&_x, &_expected, true);
+  #define HV_SPINLOCK_RELEASE(_x) atomic_store(&_x, false)
+#elif defined(__has_include)
+  #if __has_include(<stdatomic.h>)
+    #include <stdatomic.h>
+    #define hv_atomic_bool volatile atomic_bool
+    #define HV_SPINLOCK_ACQUIRE(_x) \
+    bool _expected = false; \
+    while (!atomic_compare_exchange_strong(&_x, &_expected, true)) { _expected = false; }
+    #define HV_SPINLOCK_TRY(_x) \
+    bool _expected = false; \
+    return atomic_compare_exchange_strong(&_x, &_expected, true);
+    #define HV_SPINLOCK_RELEASE(_x) atomic_store(&_x, false)
+  #else
+    #define hv_atomic_bool volatile bool
+    #define HV_SPINLOCK_ACQUIRE(_x) \
+    while (_x) {} \
+    _x = true;
+    #define HV_SPINLOCK_TRY(_x) \
+    if (!_x) { \
+      _x = true; \
+      return true; \
+    } else return false;
+    #define HV_SPINLOCK_RELEASE(_x) (_x = false)
+  #endif
 #else
-#define hv_atomic_bool volatile bool
-#define HV_SPINLOCK_ACQUIRE(_x) _x = true;
-#define HV_SPINLOCK_RELEASE(_x) _x = false;
+  #define hv_atomic_bool volatile bool
+  #define HV_SPINLOCK_ACQUIRE(_x) \
+  while (_x) {} \
+  _x = true;
+  #define HV_SPINLOCK_TRY(_x) \
+  if (!_x) { \
+    _x = true; \
+    return true; \
+  } else return false;
+  #define HV_SPINLOCK_RELEASE(_x) (_x = false)
 #endif
 
 #endif // _HEAVY_UTILS_H_

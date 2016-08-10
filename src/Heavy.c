@@ -331,6 +331,18 @@ HV_EXPORT void hv_setUserData(HvBase *c, void *userData) {
 HV_EXPORT void hv_setBasePath(HvBase *c, const char *basePath) {
   ctx_setBasePath(c, basePath);
 }
+
+HV_EXPORT void hv_lock_acquire(HvBase *c) {
+  HV_SPINLOCK_ACQUIRE(c->msgLock);
+}
+
+HV_EXPORT bool hv_lock_try(HvBase *c) {
+  HV_SPINLOCK_TRY(c->msgLock);
+}
+
+HV_EXPORT void hv_lock_release(HvBase *c) {
+  HV_SPINLOCK_RELEASE(c->msgLock);
+}
 #ifdef __cplusplus
 }
 #endif

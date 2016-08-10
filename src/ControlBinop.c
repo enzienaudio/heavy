@@ -15,6 +15,7 @@
  */
 
 #include "ControlBinop.h"
+#include "HvUtils.h"
 
 hv_size_t cBinop_init(ControlBinop *o, float k) {
   o->k = k;
@@ -31,7 +32,7 @@ static float cBinop_perform_op(BinopType op, float f, const float k) {
     case HV_BINOP_MOD_BIPOLAR: return (float) ((int) f % (int) k);
     case HV_BINOP_MOD_UNIPOLAR: {
       f = (k == 0.0f) ? 0.0f : (float) ((int) f % (int) k);
-      return (f < 0.0f) ? f + fabsf(k) : f;
+      return (f < 0.0f) ? f + hv_abs_f(k) : f;
     }
     case HV_BINOP_BIT_LEFTSHIFT: return (float) (((int) f) << ((int) k));
     case HV_BINOP_BIT_RIGHTSHIFT: return (float) (((int) f) >> ((int) k));
@@ -48,8 +49,8 @@ static float cBinop_perform_op(BinopType op, float f, const float k) {
     case HV_BINOP_GREATER_THAN_EQL: return (f >= k) ? 1.0f : 0.0f;
     case HV_BINOP_MAX: return hv_max_f(f, k);
     case HV_BINOP_MIN: return hv_min_f(f, k);
-    case HV_BINOP_POW: return (f > 0.0f) ? powf(f, k) : 0.0f;
-    case HV_BINOP_ATAN2: return ((f == 0.0f) && (k == 0.0f)) ? 0.0f : atan2f(f, k);
+    case HV_BINOP_POW: return (f > 0.0f) ? hv_pow_f(f, k) : 0.0f;
+    case HV_BINOP_ATAN2: return ((f == 0.0f) && (k == 0.0f)) ? 0.0f : hv_atan2_f(f, k);
     default: return 0.0f;
   }
 }
