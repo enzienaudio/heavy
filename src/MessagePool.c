@@ -129,7 +129,9 @@ HvMessage *mp_addMessage(MessagePool *mp, const HvMessage *m) {
   } else {
     // if no appropriately sized buffer is immediately available, increase the size of the used buffer
     const hv_size_t newIndex = mp->bufferIndex + MP_BLOCK_SIZE_BYTES;
-    hv_assert(newIndex <= mp->bufferSize); // have we have exceeded the buffer size?
+    hv_assert((newIndex <= mp->bufferSize) &&
+        "The message pool buffer size has been exceeded. The context cannot store more messages. "
+        "Try using the new_with_options() initialiser with a larger pool size (default is 10KB).");
 
     for (hv_size_t j = mp->bufferIndex; j < newIndex; j += chunkSize) {
       ml_push(ml, mp->buffer + j); // push new nodes onto the list with chunk pointers
