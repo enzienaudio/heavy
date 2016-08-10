@@ -42,6 +42,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #define hv_size_t size_t
+#define hv_uint64_t uint64_t
 #define hv_uint32_t uint32_t
 #define hv_int32_t int32_t
 #define hv_uint16_t uint16_t
@@ -260,9 +261,10 @@ static inline hv_int32_t __hv_utils_min_i(hv_int32_t x, hv_int32_t y) { return (
 #define HV_SPINLOCK_ACQUIRE(_x) \
 while (InterlockedCompareExchange(&_x, true, false)) { }
 #define HV_SPINLOCK_RELEASE(_x) (_x = false)
-#elif defined(__has_include)
-#if __has_include(<stdatomic.h>)
+#elif __cplusplus || __has_include(<stdatomic.h>)
+#if !__cplusplus
 #include <stdatomic.h>
+#endif
 #define hv_atomic_bool volatile atomic_bool
 #define HV_SPINLOCK_ACQUIRE(_x) \
 bool expected = false; \
@@ -273,11 +275,5 @@ while (!atomic_compare_exchange_strong(&_x, &expected, true)) { expected = false
 #define HV_SPINLOCK_ACQUIRE(_x) _x = true;
 #define HV_SPINLOCK_RELEASE(_x) _x = false;
 #endif
-#else
-#define hv_atomic_bool volatile bool
-#define HV_SPINLOCK_ACQUIRE(_x) _x = true;
-#define HV_SPINLOCK_RELEASE(_x) _x = false;
-#endif
-
 
 #endif // _HEAVY_UTILS_H_

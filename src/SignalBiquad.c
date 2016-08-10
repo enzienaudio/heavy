@@ -118,6 +118,36 @@ void __hv_biquad_f(SignalBiquad *o, hv_bInf_t bIn, hv_bInf_t bX0, hv_bInf_t bX1,
 }
 
 static void sBiquad_k_updateCoefficients(SignalBiquad_k *const o) {
+#if 0
+  // inspect the filter coefficients to ensure that the filter is stable
+  // 1/((1-a*z^-1) * (1-b*z^-1))
+  float k = (o->a1*o->a1) - (4.0f*o->a2);
+  float l = hv_sqrt_f(hv_abs_f(k));
+
+  float m_alpha = 0.0f;
+  float m_beta = 0.0f;
+  if (k < 0.0f) {
+    // alpha is complex
+    float r_alpha = o->a1 * 0.5f;
+    float i_alpha = l * 0.5f;
+    m_alpha = (r_alpha*r_alpha + i_alpha*i_alpha); // |alpha|^2
+
+    float r_beta = (o->a2 * r_alpha) / m_alpha;
+    float i_beta = (o->a2 * -i_alpha) / m_alpha;
+    m_alpha = hv_sqrt_f(m_alpha);
+    m_beta = hv_sqrt_f(r_beta*r_beta + i_beta*i_beta);
+  } else {
+    // alpha is real
+    float alpha = (o->a1 + l) * 0.5f;
+    float beta = o->a2 / alpha;
+    m_alpha = hv_abs_f(alpha);
+    m_beta = hv_abs_f(beta);
+  }
+
+  hv_assert(m_alpha < 1.0f);
+  hv_assert(m_beta < 1.0f);
+#endif
+
   // calculate all filter coefficients in the double domain
 #if HV_SIMD_AVX || HV_SIMD_SSE || HV_SIMD_NEON
   double b0 = (double) o->b0;
