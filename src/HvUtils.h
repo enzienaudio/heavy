@@ -41,11 +41,14 @@
 // type definitions
 #include <stdint.h>
 #include <stdbool.h>
-#define hv_size_t size_t
-#define hv_uint64_t uint64_t
-#define hv_uint32_t uint32_t
-#define hv_int32_t int32_t
+#define hv_uint8_t uint8_t
+#define hv_int16_t int16_t
 #define hv_uint16_t uint16_t
+#define hv_int32_t int32_t
+#define hv_uint32_t uint32_t
+#define hv_uint64_t uint64_t
+#define hv_size_t size_t
+#define hv_uintptr_t uintptr_t
 
 // SIMD-specific includes
 #if !(HV_SIMD_NONE || HV_SIMD_NEON || HV_SIMD_SSE || HV_SIMD_AVX)
@@ -125,7 +128,6 @@
 #define hv_snprintf(a, b, c, ...) snprintf(a, b, c, __VA_ARGS__)
 
 // Memory management
-#define hv_realloc(a, b) realloc(a, b)
 #define hv_memcpy(a, b, c) memcpy(a, b, c)
 #define hv_memclear(a, b) memset(a, 0, b)
 #if HV_MSVC
@@ -133,16 +135,20 @@
   #define hv_alloca(_n) _alloca(_n)
   #if HV_SIMD_AVX
     #define hv_malloc(_n) _aligned_malloc(_n, 32)
+    #define hv_realloc(a, b) _aligned_realloc(a, b, 32)
     #define hv_free(x) _aligned_free(x)
   #elif HV_SIMD_SSE || HV_SIMD_NEON
     #define hv_malloc(_n) _aligned_malloc(_n, 16)
+    #define hv_realloc(a, b) _aligned_realloc(a, b, 16)
     #define hv_free(x) _aligned_free(x)
   #else // HV_SIMD_NONE
     #define hv_malloc(_n) malloc(_n)
+    #define hv_realloc(a, b) realloc(a, b)
     #define hv_free(_n) free(_n)
   #endif
 #elif HV_APPLE
   #define hv_alloca(_n) alloca(_n)
+  #define hv_realloc(a, b) realloc(a, b)
   #if HV_SIMD_AVX
     #include <mm_malloc.h>
     #define hv_malloc(_n) _mm_malloc(_n, 32)
@@ -162,6 +168,7 @@
 #else
   #include <alloca.h>
   #define hv_alloca(_n) alloca(_n)
+  #define hv_realloc(a, b) realloc(a, b)
   #if HV_SIMD_AVX
     #define hv_malloc(_n) aligned_alloc(32, _n)
     #define hv_free(x) free(x)
@@ -258,44 +265,32 @@ static inline hv_int32_t __hv_utils_min_i(hv_int32_t x, hv_int32_t y) { return (
 #if HV_WIN
   #include <Windows.h>
   #define hv_atomic_bool volatile LONG
-  #define HV_SPINLOCK_ACQUIRE(_x) \
-  while (InterlockedCompareExchange(&_x, true, false)) { }
-  #define HV_SPINLOCK_TRY(_x) \
-  return !InterlockedCompareExchange(&_x, true, false);
+  #define HV_SPINLOCK_ACQUIRE(_x) while (InterlockedCompareExchange(&_x, true, false)) { }
+  #define HV_SPINLOCK_TRY(_x) return !InterlockedCompareExchange(&_x, true, false)
   #define HV_SPINLOCK_RELEASE(_x) (_x = false)
+#elif HV_ANDROID
+  // Android support for atomics isn't that great, we'll do it manually
+  // https://gcc.gnu.org/onlinedocs/gcc-4.1.2/gcc/Atomic-Builtins.html
+  #define hv_atomic_bool hv_uint8_t
+  #define HV_SPINLOCK_ACQUIRE(_x) while (__sync_lock_test_and_set(&_x, 1))
+  #define HV_SPINLOCK_TRY(_x) return !__sync_lock_test_and_set(&_x, 1)
+  #define HV_SPINLOCK_RELEASE(_x) __sync_lock_release(&_x)
 #elif __cplusplus
-  #define hv_atomic_bool volatile atomic_bool
-  #define HV_SPINLOCK_ACQUIRE(_x) \
-  bool _expected = false; \
-  while (!atomic_compare_exchange_strong(&_x, &_expected, true)) { _expected = false; }
-  #define HV_SPINLOCK_TRY(_x) \
-  bool _expected = false; \
-  return atomic_compare_exchange_strong(&_x, &_expected, true);
-  #define HV_SPINLOCK_RELEASE(_x) atomic_store(&_x, false)
+  #include <atomic>
+  #define hv_atomic_bool std::atomic_flag
+  #define HV_SPINLOCK_ACQUIRE(_x) while (_x.test_and_set(std::memory_order_acquire))
+  #define HV_SPINLOCK_TRY(_x) return !_x.test_and_set(std::memory_order_acquire)
+  #define HV_SPINLOCK_RELEASE(_x) _x.clear(std::memory_order_release)
 #elif defined(__has_include)
   #if __has_include(<stdatomic.h>)
     #include <stdatomic.h>
-    #define hv_atomic_bool volatile atomic_bool
-    #define HV_SPINLOCK_ACQUIRE(_x) \
-    bool _expected = false; \
-    while (!atomic_compare_exchange_strong(&_x, &_expected, true)) { _expected = false; }
-    #define HV_SPINLOCK_TRY(_x) \
-    bool _expected = false; \
-    return atomic_compare_exchange_strong(&_x, &_expected, true);
-    #define HV_SPINLOCK_RELEASE(_x) atomic_store(&_x, false)
-  #else
-    #define hv_atomic_bool volatile bool
-    #define HV_SPINLOCK_ACQUIRE(_x) \
-    while (_x) {} \
-    _x = true;
-    #define HV_SPINLOCK_TRY(_x) \
-    if (!_x) { \
-      _x = true; \
-      return true; \
-    } else return false;
-    #define HV_SPINLOCK_RELEASE(_x) (_x = false)
+    #define hv_atomic_bool atomic_flag
+    #define HV_SPINLOCK_ACQUIRE(_x) while (atomic_flag_test_and_set_explicit(&_x, memory_order_acquire))
+    #define HV_SPINLOCK_TRY(_x) return !atomic_flag_test_and_set_explicit(&_x, memory_order_acquire)
+    #define HV_SPINLOCK_RELEASE(_x) atomic_flag_clear_explicit(memory_order_release)
   #endif
-#else
+#endif
+#ifndef hv_atomic_bool
   #define hv_atomic_bool volatile bool
   #define HV_SPINLOCK_ACQUIRE(_x) \
   while (_x) {} \

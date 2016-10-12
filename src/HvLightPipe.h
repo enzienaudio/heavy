@@ -19,11 +19,11 @@
 #ifndef _HEAVY_LIGHTPIPE_H_
 #define _HEAVY_LIGHTPIPE_H_
 
+#include "HvUtils.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "HvUtils.h"
 
 /*
  * This pipe assumes that there is only one producer thread and one consumer

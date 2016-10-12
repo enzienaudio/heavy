@@ -39,7 +39,7 @@ HvMessage *msg_initWithBang(HvMessage *m, hv_uint32_t timestamp) {
   return m;
 }
 
-HvMessage *msg_initWithSymbol(HvMessage *m, hv_uint32_t timestamp, char *s) {
+HvMessage *msg_initWithSymbol(HvMessage *m, hv_uint32_t timestamp, const char *s) {
   m->timestamp = timestamp;
   m->numElements = 1;
   m->numBytes = sizeof(HvMessage) + (hv_uint16_t) hv_strlen(s);

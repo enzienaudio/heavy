@@ -19,6 +19,10 @@
 
 #include "HvUtils.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum ElementType {
   HV_MSG_BANG,
   HV_MSG_FLOAT,
@@ -30,7 +34,7 @@ typedef struct Element {
   ElementType type;
   union {
     float f; // float
-    char *s; // symbol
+    const char *s; // symbol
     hv_uint32_t h; // hash
   } data;
 } Element;
@@ -71,7 +75,7 @@ HvMessage *msg_initWithFloat(HvMessage *m, hv_uint32_t timestamp, float f);
 
 HvMessage *msg_initWithBang(HvMessage *m, hv_uint32_t timestamp);
 
-HvMessage *msg_initWithSymbol(HvMessage *m, hv_uint32_t timestamp, char *s);
+HvMessage *msg_initWithSymbol(HvMessage *m, hv_uint32_t timestamp, const char *s);
 
 HvMessage *msg_initWithHash(HvMessage *m, hv_uint32_t timestamp, hv_uint32_t h);
 
@@ -143,7 +147,7 @@ hv_uint32_t msg_symbolToHash(const char *s);
 /** Returns a 32-bit hash of the given element. */
 hv_uint32_t msg_getHash(const HvMessage *const m, int i);
 
-static inline void msg_setSymbol(HvMessage *m, int index, char *s) {
+static inline void msg_setSymbol(HvMessage *m, int index, const char *s) {
   hv_assert(index < msg_getNumElements(m)); // invalid index
   hv_assert(s != NULL);
   (&(m->elem)+index)->type = HV_MSG_SYMBOL;
@@ -153,7 +157,7 @@ static inline void msg_setSymbol(HvMessage *m, int index, char *s) {
   m->numBytes += (hv_uint16_t) (hv_strlen(s) + 1); // also count '\0'
 }
 
-static inline char *msg_getSymbol(const HvMessage *m, int index) {
+static inline const char *msg_getSymbol(const HvMessage *m, int index) {
   hv_assert(index < msg_getNumElements(m)); // invalid index
   return (&(m->elem)+index)->data.s;
 }
@@ -175,18 +179,8 @@ bool msg_hasFormat(const HvMessage *m, const char *fmt);
  */
 char *msg_toString(const HvMessage *msg);
 
-/**
- * Resolves any number of dollar arguments and generates a string based on the arguments.
- * @param m  The message from which to take values
- * @param n  The message to fill in
- * @param z  The element index to resolve
- * @param buf  The scratch (i.e. resolution) buffer
- * @param len  The length of the scratch buffer
- * @param args  A string of 'i' and 's' chars indicating the type of the arguments, either indicies or strings
- * @param varargs  The components to resolve, either dollar indicies or strings.
- * If the index is negative, the graph id is used
- * @return  true if the resolution buffer is needed, false otherwise.
- */
-// bool msg_resolveDollarArguments(HvMessage *m, HvMessage *n, int z, char *buf, hv_size_t len, const char *args, ...);
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _HEAVY_MESSAGE_H_

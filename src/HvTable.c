@@ -14,9 +14,8 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "HvBase.h"
-#include "HvMessage.h"
 #include "HvTable.h"
+#include "HvMessage.h"
 
 hv_size_t hTable_init(HvTable *o, int length) {
   o->length = length;
@@ -32,7 +31,7 @@ hv_size_t hTable_init(HvTable *o, int length) {
   return numBytes;
 }
 
-hv_size_t hTable_initWithData(HvTable *o, int length, const float *const data) {
+hv_size_t hTable_initWithData(HvTable *o, int length, const float *data) {
   o->length = length;
   o->size = (length + HV_N_SIMD_MASK) & ~HV_N_SIMD_MASK;
   o->allocated = o->size + HV_N_SIMD;
@@ -63,34 +62,39 @@ int hTable_resize(HvTable *o, hv_uint32_t newLength) {
   // NOTE(mhroth): mirrored bytes are not necessarily carried over
   const hv_uint32_t newSize = (newLength + HV_N_SIMD_MASK) & ~HV_N_SIMD_MASK;
   if (newSize == o->size) return 0; // early exit if no change in size
-  const hv_uint32_t oldBytes = (hv_uint32_t) (o->size * sizeof(float));
+  const hv_uint32_t oldSizeBytes = (hv_uint32_t) (o->size * sizeof(float));
   const hv_uint32_t newAllocated = newSize + HV_N_SIMD;
-  const hv_uint32_t newBytes = (hv_uint32_t) (newAllocated * sizeof(float));
-  float *b = (float *) hv_realloc(o->buffer, newBytes);
+  const hv_uint32_t newAllocatedBytes = (hv_uint32_t) (newAllocated * sizeof(float));
+
+  float *b = (float *) hv_realloc(o->buffer, newAllocatedBytes);
   hv_assert(b != NULL); // error while reallocing!
-  if (newSize > o->size) hv_memclear(b+o->size, (newAllocated-o->size)*sizeof(float)); // clear new parts of the buffer
-  if (b != o->buffer) {
-    // the buffer has been reallocated, ensure that it is on a 32-byte boundary
-    if ((((uintptr_t) (const void *) b) & 0x10) == 0) {
-      o->buffer = b;
-    } else {
-      float *c = (float *) hv_malloc(newBytes);
-      hv_assert(c != NULL);
-      hv_memclear(c, newLength*sizeof(float));
-      const hv_size_t min = hv_min_ui(o->size, newLength);
-      hv_memcpy(c, b, min * sizeof(float));
-      hv_free(b);
-      o->buffer = c;
+  // ensure that hv_realloc has given us a correctly aligned buffer
+  if ((((hv_uintptr_t) (const void *) b) & ((0x1<<HV_N_SIMD)-1)) == 0) {
+    if (newSize > o->size) {
+      hv_memclear(b + o->size, (newAllocated - o->size) * sizeof(float)); // clear new parts of the buffer
     }
+    o->buffer = b;
+  } else {
+    // if not, we have to re-malloc ourselves
+    char *c = (char *) hv_malloc(newAllocatedBytes);
+    hv_assert(c != NULL); // error while allocating new buffer!
+    if (newAllocatedBytes > oldSizeBytes) {
+      hv_memcpy(c, b, oldSizeBytes);
+      hv_memclear(c + oldSizeBytes, newAllocatedBytes - oldSizeBytes);
+    } else {
+      hv_memcpy(c, b, newAllocatedBytes);
+    }
+    hv_free(b);
+    o->buffer = (float *) c;
   }
   o->length = newLength;
   o->size = newSize;
   o->allocated = newAllocated;
-  return (int) (newBytes - oldBytes);
+  return (int) (newAllocated - oldSizeBytes - (HV_N_SIMD*sizeof(float)));
 }
 
-void hTable_onMessage(HvBase *_c, HvTable *o, int letIn, const HvMessage *const m,
-    void (*sendMessage)(HvBase *, int, const HvMessage *const)) {
+void hTable_onMessage(HeavyContextInterface *_c, HvTable *o, int letIn, const HvMessage *m,
+    void (*sendMessage)(HeavyContextInterface *, int, const HvMessage *)) {
   if (msg_compareSymbol(m,0,"resize") && msg_isFloat(m,1) && msg_getFloat(m,1) >= 0.0f) {
     hTable_resize(o, (int) hv_ceil_f(msg_getFloat(m,1))); // apply ceil to ensure that tables always have enough space
 

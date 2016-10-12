@@ -17,8 +17,12 @@
 #ifndef _HEAVY_TABLE_H_
 #define _HEAVY_TABLE_H_
 
-struct HvBase;
-struct HvMessage;
+#include "HvHeavy.h"
+#include "HvUtils.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct HvTable {
   float *buffer;
@@ -39,7 +43,7 @@ typedef struct HvTable {
 
 hv_size_t hTable_init(HvTable *o, int length);
 
-hv_size_t hTable_initWithData(HvTable *o, int length, const float *const data);
+hv_size_t hTable_initWithData(HvTable *o, int length, const float *data);
 
 hv_size_t hTable_initWithFinalData(HvTable *o, int length, float *data);
 
@@ -47,8 +51,8 @@ void hTable_free(HvTable *o);
 
 int hTable_resize(HvTable *o, hv_uint32_t newLength);
 
-void hTable_onMessage(HvBase *_c, HvTable *o, int letIn, const HvMessage *const m,
-    void (*sendMessage)(HvBase *, int, const HvMessage *const));
+void hTable_onMessage(HeavyContextInterface *_c, HvTable *o, int letIn, const HvMessage *m,
+    void (*sendMessage)(HeavyContextInterface *, int, const HvMessage *));
 
 static inline float *hTable_getBuffer(HvTable *o) {
   return o->buffer;
@@ -76,5 +80,9 @@ static inline hv_uint32_t hTable_getHead(HvTable *o) {
 static inline void hTable_setHead(HvTable *o, hv_uint32_t head) {
   o->head = head;
 }
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif // _HEAVY_TABLE_H_
