@@ -46,7 +46,7 @@ void sLine_onMessage(HeavyContextInterface *_c, SignalLine *o, int letIn,
   if (msg_isFloat(m,0)) {
     if (msg_isFloat(m,1)) {
       // new ramp
-      int n = hv_millisecondsToSamples(_c, msg_getFloat(m,1));
+      int n = (int) hv_millisecondsToSamples(_c, msg_getFloat(m,1));
 #if HV_SIMD_AVX
       float x = (o->n[1] > 0) ? (o->x[7] + (o->m[7]/8.0f)) : o->t[7]; // current output value
       float s = (msg_getFloat(m,0) - x) / ((float) n); // slope per sample

@@ -35,7 +35,7 @@ static inline void __hv_del1_f(SignalDel1 *o, hv_bInf_t bIn0, hv_bOutf_t bOut) {
 #if HV_SIMD_AVX
   __m256 x = _mm256_permute_ps(bIn0, _MM_SHUFFLE(2,1,0,3)); // [3 0 1 2 7 4 5 6]
   __m256 n = _mm256_permute2f128_ps(o->x,x,0x1);            // [h e f g 3 0 1 2]
-  *bOut = _mm256_blend_ps(x, n, 0x11);                      // [g 0 1 2 3 4 5 6]
+  *bOut = _mm256_blend_ps(x, n, 0x11);                      // [h 0 1 2 3 4 5 6]
   o->x = x;
 #elif HV_SIMD_SSE
   __m128 n = _mm_blend_ps(o->x, bIn0, 0x7);

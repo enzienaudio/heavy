@@ -24,9 +24,9 @@ extern "C" {
 #pragma mark - Heavy Table
 #endif
 
-HV_EXPORT int hv_table_resize(HeavyContextInterface *c, hv_uint32_t tableHash, hv_uint32_t newLength) {
+HV_EXPORT bool hv_table_setLength(HeavyContextInterface *c, hv_uint32_t tableHash, hv_uint32_t newSampleLength) {
   hv_assert(c != nullptr);
-  return c->setLengthForTable(tableHash, newLength);
+  return c->setLengthForTable(tableHash, newSampleLength);
 }
 
 HV_EXPORT float *hv_table_getBuffer(HeavyContextInterface *c, hv_uint32_t tableHash) {
@@ -151,19 +151,17 @@ HV_EXPORT int hv_getNumOutputChannels(HeavyContextInterface *c) {
   return c->getNumOutputChannels();
 }
 
-HV_EXPORT void hv_setPrintHook(HeavyContextInterface *c,
-    void (*f)(HeavyContextInterface *, const char *, const char *, const HvMessage *)) {
+HV_EXPORT void hv_setPrintHook(HeavyContextInterface *c, HvPrintHook_t *f) {
   hv_assert(c != nullptr);
   c->setPrintHook(f);
 }
 
-HV_EXPORT void (*hv_getPrintHook(HeavyContextInterface *c))(HeavyContextInterface *, const char *, const char *, const HvMessage *) {
+HV_EXPORT HvPrintHook_t *hv_getPrintHook(HeavyContextInterface *c) {
   hv_assert(c != nullptr);
   return c->getPrintHook();
 }
 
-HV_EXPORT void hv_setSendHook(HeavyContextInterface *c,
-    void (*f)(HeavyContextInterface *, const char *, unsigned int, const HvMessage *)) {
+HV_EXPORT void hv_setSendHook(HeavyContextInterface *c, HvSendHook_t *f) {
   hv_assert(c != nullptr);
   c->setSendHook(f);
 }
@@ -258,6 +256,11 @@ HV_EXPORT hv_uint32_t hv_millisecondsToSamples(HeavyContextInterface *c, float m
   return c->millisecondsToSamples(ms);
 }
 
+HV_EXPORT int hv_getParameterInfo(HeavyContextInterface *c, int index, HvParameterInfo *info) {
+  hv_assert(c != nullptr);
+  return c->getParameterInfo(index, info);
+}
+
 HV_EXPORT void hv_lock_acquire(HeavyContextInterface *c) {
   hv_assert(c != nullptr);
   c->lockAcquire();
@@ -292,6 +295,11 @@ HV_EXPORT int hv_processInline(HeavyContextInterface *c, float *inputBuffers, fl
 HV_EXPORT int hv_processInlineInterleaved(HeavyContextInterface *c, float *inputBuffers, float *outputBuffers, int n) {
   hv_assert(c != nullptr);
   return c->processInlineInterleaved(inputBuffers, outputBuffers, n);
+}
+
+HV_EXPORT int hv_processInlineInterleavedShort(HeavyContextInterface *c, hv_int16_t *inputBuffers, hv_int16_t *outputBuffers, int n) {
+  hv_assert(c != nullptr);
+  return c->processInlineInterleavedShort(inputBuffers, outputBuffers, n);
 }
 
 HV_EXPORT void hv_delete(HeavyContextInterface *c) {

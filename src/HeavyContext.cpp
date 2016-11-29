@@ -138,11 +138,12 @@ int HeavyContext::getLengthForTable(hv_uint32_t tableHash) {
   } else return 0;
 }
 
-int HeavyContext::setLengthForTable(hv_uint32_t tableHash, int newLength) {
+bool HeavyContext::setLengthForTable(hv_uint32_t tableHash, hv_uint32_t newSampleLength) {
   HvTable *t = getTableForHash(tableHash);
   if (t != nullptr) {
-    return hTable_resize(t, newLength);
-  } else return 0;
+    hTable_resize(t, newSampleLength);
+    return true;
+  } else return false;
 }
 
 void HeavyContext::lockAcquire() {

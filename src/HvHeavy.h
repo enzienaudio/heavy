@@ -17,17 +17,43 @@
 #ifndef _HEAVY_H_
 #define _HEAVY_H_
 
-#include <stdbool.h>
+#include "HvUtils.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#ifndef _HEAVY_DECLARATIONS_
+#define _HEAVY_DECLARATIONS_
 
 #ifdef __cplusplus
 class HeavyContextInterface;
 #else
 typedef struct HeavyContextInterface HeavyContextInterface;
 #endif
+
+typedef struct HvMessage HvMessage;
+
+typedef enum {
+  HV_PARAM_TYPE_PARAMETER,
+  HV_PARAM_TYPE_EVENT
+} HvParameterType;
+
+typedef struct HvParameterInfo {
+  const char *name;     // the human readable parameter name
+  hv_uint32_t hash;     // an integer identified used by heavy for this parameter
+  HvParameterType type; // type of this parameter
+  float minVal;         // the minimum value of this parameter
+  float maxVal;         // the maximum value of this parameter
+  float defaultVal;     // the default value of this parameter
+} HvParameterInfo;
+
+typedef void (HvSendHook_t) (HeavyContextInterface *context, const char *sendName, hv_uint32_t sendHash, const HvMessage *msg);
+typedef void (HvPrintHook_t) (HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg);
+
+#endif // _HEAVY_DECLARATIONS_
+
+
 
 #if HV_APPLE
 #pragma mark - Heavy Context
@@ -48,6 +74,7 @@ void hv_delete(HeavyContextInterface *c);
  * The number of samples to to tbe processed should be a multiple of 1, 4, or 8, depending on if
  * no, SSE or NEON, or AVX optimisation is being used, respectively.
  * e.g. [[LLLL][RRRR]]
+ * This function support in-place processing.
  *
  * @return  The number of samples processed.
  *
@@ -61,6 +88,7 @@ int hv_process(HeavyContextInterface *c, float **inputBuffers, float **outputBuf
  * The number of samples to to tbe processed should be a multiple of 1, 4, or 8, depending on if
  * no, SSE or NEON, or AVX optimisation is being used, respectively.
  * e.g. [LLLLRRRR]
+ * This function support in-place processing.
  *
  * @return  The number of samples processed.
  *
@@ -74,6 +102,7 @@ int hv_processInline(HeavyContextInterface *c, float *inputBuffers, float *outpu
  * The number of samples to to tbe processed should be a multiple of 1, 4, or 8, depending on if
  * no, SSE or NEON, or AVX optimisation is being used, respectively.
  * e.g. [LRLRLRLR]
+ * This function support in-place processing.
  *
  * @return  The number of samples processed.
  *
@@ -87,20 +116,19 @@ int hv_processInlineInterleaved(HeavyContextInterface *c, float *inputBuffers, f
  * The number of samples to to tbe processed should be a multiple of 1, 4, or 8, depending on if
  * no, SSE or NEON, or AVX optimisation is being used, respectively.
  * e.g. [LRLRLRLR]
+ * This function support in-place processing.
  *
  * @return  The number of samples processed.
  *
  * This function is NOT thread-safe. It is assumed that only the audio thread will execute this function.
  */
-int hv_processInlineInterleavedShort(HeavyContextInterface *c, short *inputBuffers, short *outputBuffers, int n);
+int hv_processInlineInterleavedShort(HeavyContextInterface *c, hv_int16_t *inputBuffers, hv_int16_t *outputBuffers, int n);
 
 
 
 #if HV_APPLE
 #pragma mark - Heavy Common
 #endif
-
-typedef struct HvMessage HvMessage;
 
 /**
  * Returns the total size in bytes of the context.
@@ -118,22 +146,20 @@ int hv_getNumInputChannels(HeavyContextInterface *c);
 int hv_getNumOutputChannels(HeavyContextInterface *c);
 
 /** Set the print hook. The function is called whenever a message is sent to a print object. */
-void hv_setPrintHook(HeavyContextInterface *c,
-    void (*f)(HeavyContextInterface *, const char *, const char *, const HvMessage *m));
+void hv_setPrintHook(HeavyContextInterface *c, HvPrintHook_t *f);
 
 /** Returns the print hook, or NULL. */
-void (*hv_getPrintHook(HeavyContextInterface *c))(HeavyContextInterface *, const char *, const char *, const HvMessage *);
+HvPrintHook_t *hv_getPrintHook(HeavyContextInterface *c);
 
 /**
  * Set the send hook. The function is called whenever a message is sent to any send object.
  * Messages returned by this function should NEVER be freed. If the message must persist, call
  * hv_msg_copy() first.
  */
-void hv_setSendHook(HeavyContextInterface *c,
-    void (*f)(HeavyContextInterface *, const char *sendName, unsigned int sendHash, const HvMessage *));
+void hv_setSendHook(HeavyContextInterface *c, HvSendHook_t *f);
 
 /** Returns a 32-bit hash of any string. Returns 0 if string is NULL. */
-unsigned int hv_stringToHash(const char *s);
+hv_uint32_t hv_stringToHash(const char *s);
 
 /**
  * A convenience function to send a bang to a receiver to be processed immediately.
@@ -143,7 +169,7 @@ unsigned int hv_stringToHash(const char *s);
  * @return  True if the message was accepted. False if the message could not fit onto
  *          the message queue to be processed this block.
  */
-bool hv_sendBangToReceiver(HeavyContextInterface *c, unsigned int receiverHash);
+bool hv_sendBangToReceiver(HeavyContextInterface *c, hv_uint32_t receiverHash);
 
 /**
  * A convenience function to send a float to a receiver to be processed immediately.
@@ -153,7 +179,7 @@ bool hv_sendBangToReceiver(HeavyContextInterface *c, unsigned int receiverHash);
  * @return  True if the message was accepted. False if the message could not fit onto
  *          the message queue to be processed this block.
  */
-bool hv_sendFloatToReceiver(HeavyContextInterface *c, unsigned int receiverHash, const float x);
+bool hv_sendFloatToReceiver(HeavyContextInterface *c, hv_uint32_t receiverHash, const float x);
 
 /**
  * A convenience function to send a symbol to a receiver to be processed immediately.
@@ -163,7 +189,7 @@ bool hv_sendFloatToReceiver(HeavyContextInterface *c, unsigned int receiverHash,
  * @return  True if the message was accepted. False if the message could not fit onto
  *          the message queue to be processed this block.
  */
-bool hv_sendSymbolToReceiver(HeavyContextInterface *c, unsigned int receiverHash, char *s);
+bool hv_sendSymbolToReceiver(HeavyContextInterface *c, hv_uint32_t receiverHash, char *s);
 
 /**
  * Sends a formatted message to a receiver that can be scheduled for the future.
@@ -173,7 +199,7 @@ bool hv_sendSymbolToReceiver(HeavyContextInterface *c, unsigned int receiverHash
  * @return  True if the message was accepted. False if the message could not fit onto
  *          the message queue to be processed this block.
  */
-bool hv_sendMessageToReceiverV(HeavyContextInterface *c, unsigned int receiverHash, double delayMs, const char *format, ...);
+bool hv_sendMessageToReceiverV(HeavyContextInterface *c, hv_uint32_t receiverHash, double delayMs, const char *format, ...);
 
 /**
  * Sends a message to a receiver that can be scheduled for the future.
@@ -183,7 +209,7 @@ bool hv_sendMessageToReceiverV(HeavyContextInterface *c, unsigned int receiverHa
  * @return  True if the message was accepted. False if the message could not fit onto
  *          the message queue to be processed this block.
  */
-bool hv_sendMessageToReceiver(HeavyContextInterface *c, unsigned int receiverHash, double delayMs, HvMessage *m);
+bool hv_sendMessageToReceiver(HeavyContextInterface *c, hv_uint32_t receiverHash, double delayMs, HvMessage *m);
 
 /**
  * Cancels a previously scheduled message.
@@ -205,13 +231,27 @@ void *hv_getUserData(HeavyContextInterface *c);
 double hv_getCurrentTime(HeavyContextInterface *c);
 
 /** Returns the current patch time in samples. This value is always exact. */
-unsigned int hv_getCurrentSample(HeavyContextInterface *c);
+hv_uint32_t hv_getCurrentSample(HeavyContextInterface *c);
+
+/**
+ * Returns information about each parameter such as name, hash, and range.
+ *
+ * If info is null then the total number of parameters is returned.
+ * If info is not null, then the structure is filled in for the given parameter index.
+ *
+ * @param c  A HeavyContextInterface.
+ * @param index  The parameter index.
+ * @param info  A pointer to a HvParameterInfo struct. May be null.
+ *
+ * @return  The total number of parameters, if info is null. 0 otherwise.
+ */
+int hv_getParameterInfo(HeavyContextInterface *c, int index, HvParameterInfo *info);
 
 /** */
-float hv_samplesToMilliseconds(HeavyContextInterface *c, unsigned int numSamples);
+float hv_samplesToMilliseconds(HeavyContextInterface *c, hv_uint32_t numSamples);
 
-/** */
-unsigned int hv_millisecondsToSamples(HeavyContextInterface *c, float ms);
+/** Converts milliseconds to samples. Input is limited to non-negative range. */
+hv_uint32_t hv_millisecondsToSamples(HeavyContextInterface *c, float ms);
 
 /**
  * Acquire the message lock.
@@ -253,19 +293,19 @@ void hv_lock_release(HeavyContextInterface *c);
 typedef struct HvMessage HvMessage;
 
 /** Returns the total size in bytes of a HvMessage with a number of elements on the heap. */
-unsigned long hv_msg_getByteSize(unsigned int numElements);
+unsigned long hv_msg_getByteSize(hv_uint32_t numElements);
 
 /** Initialise a HvMessage structure with the number of elements and a timestamp (in samples). */
-void hv_msg_init(HvMessage *m, int numElements, unsigned int timestamp);
+void hv_msg_init(HvMessage *m, int numElements, hv_uint32_t timestamp);
 
 /** Returns the number of elements in this message. */
 unsigned long hv_msg_getNumElements(const HvMessage *m);
 
 /** Returns the time at which this message exists (in samples). */
-unsigned int hv_msg_getTimestamp(const HvMessage *m);
+hv_uint32_t hv_msg_getTimestamp(const HvMessage *m);
 
 /** Set the time at which this message should be executed (in samples). */
-void hv_msg_setTimestamp(HvMessage *m, unsigned int timestamp);
+void hv_msg_setTimestamp(HvMessage *m, hv_uint32_t timestamp);
 
 /** Returns true of the indexed element is a bang. False otherwise. Index is not bounds checked. */
 bool hv_msg_isBang(const HvMessage *const m, int i);
@@ -292,7 +332,7 @@ const char *hv_msg_getSymbol(const HvMessage *const m, int i);
 bool hv_msg_isHash(const HvMessage *const m, int i);
 
 /** Returns the indexed element as a hash value. Index is not bounds checked. */
-unsigned int hv_msg_getHash(const HvMessage *const m, int i);
+hv_uint32_t hv_msg_getHash(const HvMessage *const m, int i);
 
 /** Sets the indexed element to symbol value. Index is not bounds checked. */
 void hv_msg_setSymbol(HvMessage *m, int i, const char *s);
@@ -328,17 +368,23 @@ void hv_msg_free(HvMessage *m);
 #endif
 
 /**
- * Resizes the table to the given length. Length must be positive.
- * Existing contents are copied to the new table. Remaining space is cleared.
- * The change in byte-size of the table is returned. A value of zero indicates error.
+ * Resizes the table to the given length.
+ *
+ * Existing contents are copied to the new table. Remaining space is cleared
+ * if the table is longer than the original, truncated otherwise.
+ *
+ * @param tableHash  The table identifier.
+ * @param newSampleLength  The new length of the table, in samples. Must be positive.
+ *
+ * @return  False if the table could not be found. True otherwise.
  */
-int hv_table_resize(HeavyContextInterface *c, unsigned int tableHash, unsigned int newLength);
+bool hv_table_setLength(HeavyContextInterface *c, hv_uint32_t tableHash, hv_uint32_t newSampleLength);
 
 /** Returns a pointer to the raw buffer backing this table. DO NOT free it. */
-float *hv_table_getBuffer(HeavyContextInterface *c, unsigned int tableHash);
+float *hv_table_getBuffer(HeavyContextInterface *c, hv_uint32_t tableHash);
 
 /** Returns the length of this table in samples. */
-unsigned int hv_table_getLength(HeavyContextInterface *c, unsigned int tableHash);
+hv_uint32_t hv_table_getLength(HeavyContextInterface *c, hv_uint32_t tableHash);
 
 #ifdef __cplusplus
 } // extern "C"

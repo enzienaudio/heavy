@@ -58,22 +58,23 @@ void cDelay_onMessage(HeavyContextInterface *_c, ControlDelay *o, int letIn, con
             break;
           }
         }
-        hv_assert(i < __HV_DELAY_MAX_MESSAGES); // scheduled message limit reached
+        hv_assert((i < __HV_DELAY_MAX_MESSAGES) && // scheduled message limit reached
+            "[__delay] cannot track any more messages. Try increasing the size of __HV_DELAY_MAX_MESSAGES.");
         msg_setTimestamp((HvMessage *) m, ts); // return to the original timestamp
       }
       break;
     }
     case 1: {
       if (msg_isFloat(m,0)) {
-        // set delay in milliseconds
+        // set delay in milliseconds (cannot be negative!)
         o->delay = hv_millisecondsToSamples(_c, msg_getFloat(m,0));
       }
       break;
     }
     case 2: {
       if (msg_isFloat(m,0)) {
-        // set delay in samples
-        o->delay = (hv_uint32_t) msg_getFloat(m,0);
+        // set delay in samples (cannot be negative!)
+        o->delay = (hv_uint32_t) hv_max_f(0.0f, msg_getFloat(m,0));
       }
       break;
     }

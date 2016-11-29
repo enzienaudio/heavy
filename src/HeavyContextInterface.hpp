@@ -17,8 +17,34 @@
 #ifndef _HEAVY_CONTEXT_INTERFACE_H_
 #define _HEAVY_CONTEXT_INTERFACE_H_
 
+#include "HvUtils.h"
+
+#ifndef _HEAVY_DECLARATIONS_
+#define _HEAVY_DECLARATIONS_
+
+class HeavyContextInterface;
 struct HvMessage;
-struct HvParameterInfo;
+
+typedef enum {
+  HV_PARAM_TYPE_PARAMETER,
+  HV_PARAM_TYPE_EVENT
+} HvParameterType;
+
+typedef struct HvParameterInfo {
+  const char *name;     // the human readable parameter name
+  hv_uint32_t hash;     // an integer identified used by heavy for this parameter
+  HvParameterType type; // type of this parameter
+  float minVal;         // the minimum value of this parameter
+  float maxVal;         // the maximum value of this parameter
+  float defaultVal;     // the default value of this parameter
+} HvParameterInfo;
+
+typedef void (HvSendHook_t) (HeavyContextInterface *context, const char *sendName, hv_uint32_t sendHash, const HvMessage *msg);
+typedef void (HvPrintHook_t) (HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg);
+
+#endif // _HEAVY_DECLARATIONS_
+
+
 
 class HeavyContextInterface {
 
@@ -45,9 +71,11 @@ class HeavyContextInterface {
   virtual double getSampleRate() = 0;
 
   /** Returns the current patch time in samples. This value is always exact. */
-  virtual unsigned int getCurrentSample() = 0;
-  virtual float samplesToMilliseconds(unsigned int numSamples) = 0;
-  virtual unsigned int millisecondsToSamples(float ms) = 0;
+  virtual hv_uint32_t getCurrentSample() = 0;
+  virtual float samplesToMilliseconds(hv_uint32_t numSamples) = 0;
+
+  /** Converts milliseconds to samples. Input is limited to non-negative range. */
+  virtual hv_uint32_t millisecondsToSamples(float ms) = 0;
 
   /** Sets a user-definable value. This value is never manipulated by Heavy. */
   virtual void setUserData(void *x) = 0;
@@ -60,16 +88,16 @@ class HeavyContextInterface {
    * Messages returned by this function should NEVER be freed. If the message must persist, call
    * hv_msg_copy() first.
    */
-  virtual void setSendHook(void (*f)(HeavyContextInterface *, const char *sendName, unsigned int sendHash, const HvMessage *)) = 0;
+  virtual void setSendHook(HvSendHook_t *f) = 0;
 
   /** Returns the send hook, or NULL if unset. */
-  virtual void (*getSendHook())(HeavyContextInterface *, const char *, unsigned int, const HvMessage *) = 0;
+  virtual HvSendHook_t *getSendHook() = 0;
 
   /** Set the print hook. The function is called whenever a message is sent to a print object. */
-  virtual void setPrintHook(void (*f)(HeavyContextInterface *, const char *printName, const char *str, const HvMessage *)) = 0;
+  virtual void setPrintHook(HvPrintHook_t *f) = 0;
 
   /** Returns the print hook, or NULL if unset. */
-  virtual void (*getPrintHook())(HeavyContextInterface *, const char *, const char *, const HvMessage *) = 0;
+  virtual HvPrintHook_t *getPrintHook() = 0;
 
   /**
    * Processes one block of samples for a patch instance. The buffer format is an array of float channel arrays.
@@ -121,7 +149,7 @@ class HeavyContextInterface {
    *
    * This function is NOT thread-safe. It is assumed that only the audio thread will execute this function.
    */
-  virtual int processInlineInterleavedShort(short *inputBuffers, short *outputBuffer, int n) = 0;
+  virtual int processInlineInterleavedShort(hv_int16_t *inputBuffers, hv_int16_t *outputBuffer, int n) = 0;
 
   /**
    * Sends a formatted message to a receiver that can be scheduled for the future.
@@ -131,7 +159,7 @@ class HeavyContextInterface {
    * @return  True if the message was accepted. False if the message could not fit onto
    *          the message queue to be processed this block.
    */
-  virtual bool sendMessageToReceiver(unsigned int receiverHash, double delayMs, HvMessage *m) = 0;
+  virtual bool sendMessageToReceiver(hv_uint32_t receiverHash, double delayMs, HvMessage *m) = 0;
 
   /**
    * Sends a formatted message to a receiver that can be scheduled for the future.
@@ -141,7 +169,7 @@ class HeavyContextInterface {
    * @return  True if the message was accepted. False if the message could not fit onto
    *          the message queue to be processed this block.
    */
-  virtual bool sendMessageToReceiverV(unsigned int receiverHash, double delayMs, const char *fmt, ...) = 0;
+  virtual bool sendMessageToReceiverV(hv_uint32_t receiverHash, double delayMs, const char *fmt, ...) = 0;
 
   /**
    * A convenience function to send a float to a receiver to be processed immediately.
@@ -151,7 +179,7 @@ class HeavyContextInterface {
    * @return  True if the message was accepted. False if the message could not fit onto
    *          the message queue to be processed this block.
    */
-  virtual bool sendFloatToReceiver(unsigned int receiverHash, float f) = 0;
+  virtual bool sendFloatToReceiver(hv_uint32_t receiverHash, float f) = 0;
 
   /**
    * A convenience function to send a bang to a receiver to be processed immediately.
@@ -161,7 +189,7 @@ class HeavyContextInterface {
    * @return  True if the message was accepted. False if the message could not fit onto
    *          the message queue to be processed this block.
    */
-  virtual bool sendBangToReceiver(unsigned int receiverHash) = 0;
+  virtual bool sendBangToReceiver(hv_uint32_t receiverHash) = 0;
 
   /**
    * A convenience function to send a symbol to a receiver to be processed immediately.
@@ -171,7 +199,7 @@ class HeavyContextInterface {
    * @return  True if the message was accepted. False if the message could not fit onto
    *          the message queue to be processed this block.
    */
-  virtual bool sendSymbolToReceiver(unsigned int receiverHash, const char *symbol)  = 0;
+  virtual bool sendSymbolToReceiver(hv_uint32_t receiverHash, const char *symbol)  = 0;
 
   /**
    * Cancels a previously scheduled message.
@@ -180,21 +208,37 @@ class HeavyContextInterface {
    */
   virtual bool cancelMessage(HvMessage *m, void (*sendMessage)(HeavyContextInterface *, int, const HvMessage *)=nullptr) = 0;
 
-  // parameter info
+  /**
+   * Returns information about each parameter such as name, hash, and range.
+   *
+   * If info is null then the total number of parameters is returned.
+   * If info is not null, then the structure is filled in for the given parameter index.
+   *
+   * @param index  The parameter index.
+   * @param info  A pointer to a HvParameterInfo struct. May be null.
+   *
+   * @return  The total number of parameters, if info is null. 0 otherwise.
+   */
   virtual int getParameterInfo(int index, HvParameterInfo *info) = 0;
 
   /** Returns a pointer to the raw buffer backing this table. DO NOT free it. */
-  virtual float *getBufferForTable(unsigned int tableHash) = 0;
+  virtual float *getBufferForTable(hv_uint32_t tableHash) = 0;
 
   /** Returns the length of this table in samples. */
-  virtual int getLengthForTable(unsigned int tableHash) = 0;
+  virtual int getLengthForTable(hv_uint32_t tableHash) = 0;
 
   /**
-   * Resizes the table to the given length. Length must be positive.
-   * Existing contents are copied to the new table. Remaining space is cleared.
-   * The change in byte-size of the table is returned. A value of zero indicates error.
+   * Resizes the table to the given length.
+   *
+   * Existing contents are copied to the new table. Remaining space is cleared
+   * if the table is longer than the original, truncated otherwise.
+   *
+   * @param tableHash  The table identifier.
+   * @param newSampleLength  The new length of the table, in samples.
+   *
+   * @return  False if the table could not be found. True otherwise.
    */
-  virtual int setLengthForTable(unsigned int tableHash, int newLength) = 0;
+  virtual bool setLengthForTable(hv_uint32_t tableHash, hv_uint32_t newSampleLength) = 0;
 
   /**
    * Acquire the message lock.
@@ -222,7 +266,7 @@ class HeavyContextInterface {
   virtual void lockRelease() = 0;
 
   /** Returns a 32-bit hash of any string. Returns 0 if string is NULL. */
-  static unsigned int getHashForString(const char *str);
+  static hv_uint32_t getHashForString(const char *str);
 };
 
 #endif // _HEAVY_CONTEXT_INTERFACE_H_

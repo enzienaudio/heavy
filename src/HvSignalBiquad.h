@@ -25,8 +25,12 @@ extern "C" {
 
 // http://en.wikipedia.org/wiki/Digital_biquad_filter
 typedef struct SignalBiquad {
+#if HV_SIMD_NONE
   hv_bufferf_t xm1;
   hv_bufferf_t xm2;
+#else
+  hv_bufferf_t x;
+#endif
   float ym1;
   float ym2;
 } SignalBiquad;

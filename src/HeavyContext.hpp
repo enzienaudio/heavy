@@ -36,20 +36,17 @@ class HeavyContext : public HeavyContextInterface {
 
   hv_uint32_t getCurrentSample() override { return blockStartTimestamp; }
   float samplesToMilliseconds(hv_uint32_t numSamples) override { return (float) (1000.0*numSamples/sampleRate); }
-  hv_uint32_t millisecondsToSamples(float ms) override { return (hv_uint32_t) (ms*sampleRate/1000.0); }
+  hv_uint32_t millisecondsToSamples(float ms) override { return (hv_uint32_t) (hv_max_f(0.0f,ms)*sampleRate/1000.0); }
 
   void setUserData(void *x) override { userData = x; }
   void *getUserData() override { return userData; }
 
   // hook management
-  void setSendHook(void (*f)(HeavyContextInterface *, const char *, hv_uint32_t, const HvMessage *))
-      override { sendHook = f; }
-  void (*getSendHook())(HeavyContextInterface *, const char *, unsigned int, const HvMessage *)
-      override { return sendHook; }
-  void setPrintHook(void (*f)(HeavyContextInterface *, const char *, const char *, const HvMessage *))
-      override { printHook = f; }
-  void (*getPrintHook())(HeavyContextInterface *, const char *, const char *, const HvMessage *)
-      override { return printHook; }
+  void setSendHook(HvSendHook_t *f) override { sendHook = f; }
+  HvSendHook_t *getSendHook() override { return sendHook; }
+
+  void setPrintHook(HvPrintHook_t *f) override { printHook = f; }
+  HvPrintHook_t *getPrintHook() override { return printHook; }
 
   // message scheduling
   bool sendMessageToReceiver(hv_uint32_t receiverHash, double delayMs, HvMessage *m) override;
@@ -62,7 +59,7 @@ class HeavyContext : public HeavyContextInterface {
   // table manipulation
   float *getBufferForTable(hv_uint32_t tableHash) override;
   int getLengthForTable(hv_uint32_t tableHash) override;
-  int setLengthForTable(hv_uint32_t tableHash, int newLength) override;
+  bool setLengthForTable(hv_uint32_t tableHash, hv_uint32_t newSampleLength) override;
 
   // lock control
   void lockAcquire() override;
@@ -93,8 +90,8 @@ class HeavyContext : public HeavyContextInterface {
   HvMessageQueue mq;
   HvLightPipe msgPipe;
   hv_atomic_bool msgLock;
-  void (*printHook)(HeavyContextInterface *, const char *, const char *, const HvMessage *);
-  void (*sendHook)(HeavyContextInterface *, const char *, hv_uint32_t, const HvMessage *);
+  HvSendHook_t *sendHook;
+  HvPrintHook_t *printHook;
   void *userData;
 };
 
