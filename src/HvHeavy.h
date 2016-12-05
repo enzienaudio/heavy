@@ -235,15 +235,12 @@ hv_uint32_t hv_getCurrentSample(HeavyContextInterface *c);
 
 /**
  * Returns information about each parameter such as name, hash, and range.
+ * The total number of parameters is always returned.
  *
- * If info is null then the total number of parameters is returned.
- * If info is not null, then the structure is filled in for the given parameter index.
- *
- * @param c  A HeavyContextInterface.
  * @param index  The parameter index.
  * @param info  A pointer to a HvParameterInfo struct. May be null.
  *
- * @return  The total number of parameters, if info is null. 0 otherwise.
+ * @return  The total number of parameters.
  */
 int hv_getParameterInfo(HeavyContextInterface *c, int index, HvParameterInfo *info);
 
