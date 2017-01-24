@@ -276,6 +276,28 @@ HV_EXPORT void hv_lock_release(HeavyContextInterface *c) {
   c->lockRelease();
 }
 
+HV_EXPORT void hv_setInputMessageQueueSize(HeavyContextInterface *c, hv_uint32_t inQueueKb) {
+  hv_assert(c != nullptr);
+  c->setInputMessageQueueSize(inQueueKb);
+}
+
+HV_EXPORT void hv_setOutputMessageQueueSize(HeavyContextInterface *c, hv_uint32_t outQueueKb) {
+  hv_assert(c != nullptr);
+  c->setOutputMessageQueueSize(outQueueKb);
+}
+
+HV_EXPORT bool hv_getNextSentMessage(HeavyContextInterface *c, hv_uint32_t *outSendHash, HvMessage *outMsg, hv_uint32_t msgLength) {
+  hv_assert(c != nullptr);
+  hv_assert(outMsg != nullptr);
+  return c->getNextSentMessage(outSendHash, outMsg, msgLength);
+}
+
+HV_EXPORT bool hv_getNextSentBangMessage(HeavyContextInterface *c, hv_uint32_t *outSendHash) {
+  hv_assert(c != nullptr);
+  hv_assert(outSendHash != nullptr);
+  return c->getNextSentBangMessage(outSendHash);
+}
+
 
 
 #if !HV_WIN
@@ -295,11 +317,6 @@ HV_EXPORT int hv_processInline(HeavyContextInterface *c, float *inputBuffers, fl
 HV_EXPORT int hv_processInlineInterleaved(HeavyContextInterface *c, float *inputBuffers, float *outputBuffers, int n) {
   hv_assert(c != nullptr);
   return c->processInlineInterleaved(inputBuffers, outputBuffers, n);
-}
-
-HV_EXPORT int hv_processInlineInterleavedShort(HeavyContextInterface *c, hv_int16_t *inputBuffers, hv_int16_t *outputBuffers, int n) {
-  hv_assert(c != nullptr);
-  return c->processInlineInterleavedShort(inputBuffers, outputBuffers, n);
 }
 
 HV_EXPORT void hv_delete(HeavyContextInterface *c) {

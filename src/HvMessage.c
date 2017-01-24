@@ -155,9 +155,13 @@ hv_uint32_t msg_symbolToHash(const char *s) {
   hv_uint32_t x = len; // seed (0) ^ len
 
   while (len >= 4) {
+#if HV_EMSCRIPTEN
+    hv_uint32_t k = s[0] | (s[1] << 8) | (s[2] << 16) | (s[3] << 24);
+#else
     hv_uint32_t k = *((hv_uint32_t *) s);
+#endif
     k *= n;
-    k ^= k >> r;
+    k ^= (k >> r);
     k *= n;
     x *= n;
     x ^= k;
@@ -165,15 +169,15 @@ hv_uint32_t msg_symbolToHash(const char *s) {
   }
 
   switch (len) {
-    case 3: x ^= s[2] << 16;
-    case 2: x ^= s[1] << 8;
+    case 3: x ^= (s[2] << 16);
+    case 2: x ^= (s[1] << 8);
     case 1: x ^= s[0]; x *= n;
     default: break;
   }
 
-  x ^= x >> 13;
+  x ^= (x >> 13);
   x *= n;
-  x ^= x >> 15;
+  x ^= (x >> 15);
 
   return x;
 }

@@ -139,19 +139,6 @@ class HeavyContextInterface {
   virtual int processInlineInterleaved(float *inputBuffers, float *outputBuffer, int n) = 0;
 
   /**
-   * Processes one block of samples for a patch instance. The buffer format is an interleaved short array of channels.
-   * If the context has not input or output channels, the respective argument may be NULL.
-   * The number of samples to to tbe processed should be a multiple of 1, 4, or 8, depending on if
-   * no, SSE or NEON, or AVX optimisation is being used, respectively.
-   * e.g. [LRLRLRLR]
-   *
-   * @return  The number of samples processed.
-   *
-   * This function is NOT thread-safe. It is assumed that only the audio thread will execute this function.
-   */
-  virtual int processInlineInterleavedShort(hv_int16_t *inputBuffers, hv_int16_t *outputBuffer, int n) = 0;
-
-  /**
    * Sends a formatted message to a receiver that can be scheduled for the future.
    * The receiver is addressed with its hash, which can also be determined using hv_stringToHash().
    * This function is thread-safe.
@@ -239,7 +226,7 @@ class HeavyContextInterface {
   virtual bool setLengthForTable(hv_uint32_t tableHash, hv_uint32_t newSampleLength) = 0;
 
   /**
-   * Acquire the message lock.
+   * Acquire the input message queue lock.
    *
    * This function will block until the message lock as been acquired.
    * Typical applications will not require the use of this function.
@@ -247,7 +234,7 @@ class HeavyContextInterface {
   virtual void lockAcquire() = 0;
 
   /**
-   * Try to acquire the message lock.
+   * Try to acquire the input message queue lock.
    *
    * If the lock has been acquired, hv_lock_release() must be called to release it.
    * Typical applications will not require the use of this function.
@@ -257,11 +244,45 @@ class HeavyContextInterface {
   virtual bool lockTry() = 0;
 
   /**
-   * Release the message lock.
+   * Release the input message queue lock.
    *
    * Typical applications will not require the use of this function.
    */
   virtual void lockRelease() = 0;
+
+  /**
+   * Set the size of the input message queue in kilobytes.
+   *
+   * The buffer is reset and all existing contents are lost on resize.
+   *
+   * @param inQueueKb  Must be positive i.e. at least one.
+   */
+  virtual void setInputMessageQueueSize(int inQueueKb) = 0;
+
+  /**
+   * Set the size of the output message queue in kilobytes.
+   *
+   * The buffer is reset and all existing contents are lost on resize.
+   * Only the default sendhook uses the outgoing message queue. If the default
+   * sendhook is not being used, then this function is not useful.
+   *
+   * @param outQueueKb  Must be postive i.e. at least one.
+   */
+  virtual void setOutputMessageQueueSize(int outQueueKb) = 0;
+
+  /**
+   * Get the next message in the outgoing queue, will also consume the message.
+   * Returns false if there are no messages.
+   *
+   * @param outSendHash  a hash of the name of the receiver the message was sent to.
+   * @param outMsg  message pointer that is filled by the next message contents.
+   * @param msgLength  length of outMsg in bytes.
+   *
+   * @return  True if there is a message in the outgoing queue.
+  */
+  virtual bool getNextSentMessage(hv_uint32_t *outSendHash, HvMessage *outMsg, int msgLength) = 0;
+  
+  virtual bool getNextSentBangMessage(hv_uint32_t *outSendHash) = 0;
 
   /** Returns a 32-bit hash of any string. Returns 0 if string is NULL. */
   static hv_uint32_t getHashForString(const char *str);

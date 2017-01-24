@@ -17,28 +17,52 @@
 #include "HeavyContext.hpp"
 #include "HvTable.h"
 
-HeavyContext::HeavyContext(double sampleRate, int poolKb, int queueKb) :
+void defaultSendHook(HeavyContextInterface *context,
+    const char *sendName, hv_uint32_t sendHash, const HvMessage *msg) {
+  HeavyContext *thisContext = reinterpret_cast<HeavyContext *>(context);
+  const hv_uint32_t numBytes = sizeof(ReceiverMessagePair) + msg_getSize(msg) - sizeof(HvMessage);
+  ReceiverMessagePair *p = reinterpret_cast<ReceiverMessagePair *>(hLp_getWriteBuffer(&thisContext->outQueue, numBytes));
+  if (p != nullptr) {
+    p->receiverHash = sendHash;
+    msg_copyToBuffer(msg, (char *) &p->msg, msg_getSize(msg));
+    hLp_produce(&thisContext->outQueue, numBytes);
+  } else {
+    hv_assert(false &&
+        "::defaultSendHook - The out message queue is full and cannot accept more messages until they "
+        "have been processed. Try increasing the outQueueKb size in the new_with_options() constructor.");
+  }
+}
+
+HeavyContext::HeavyContext(double sampleRate, int poolKb, int inQueueKb, int outQueueKb) :
     sampleRate(sampleRate) {
 
   hv_assert(sampleRate > 0.0); // sample rate must be positive
   hv_assert(poolKb > 0);
-  hv_assert(queueKb > 0);
+  hv_assert(inQueueKb > 0);
+  hv_assert(outQueueKb >= 0);
 
   blockStartTimestamp = 0;
   printHook = nullptr;
-  sendHook = nullptr;
   userData = nullptr;
+
+  // if outQueueKb is positive, then the outQueue is allocated and the default sendhook is set.
+  // Otherwise outQueue and the sendhook are set to NULL.
+  sendHook = (outQueueKb > 0) ? &defaultSendHook : nullptr;
+
+  HV_SPINLOCK_RELEASE(inQueueLock);
+  HV_SPINLOCK_RELEASE(outQueueLock);
 
   numBytes = sizeof(HeavyContext);
 
   numBytes += mq_initWithPoolSize(&mq, poolKb);
-  numBytes += hLp_init(&msgPipe, queueKb*1024);
-  HV_SPINLOCK_RELEASE(msgLock);
+  numBytes += hLp_init(&inQueue, inQueueKb * 1024);
+  numBytes += hLp_init(&outQueue, outQueueKb * 1024); // outQueueKb value of 0 sets everything to NULL
 }
 
 HeavyContext::~HeavyContext() {
   mq_free(&mq);
-  hLp_free(&msgPipe);
+  hLp_free(&inQueue);
+  hLp_free(&outQueue);
 }
 
 bool HeavyContext::sendBangToReceiver(hv_uint32_t receiverHash) {
@@ -94,23 +118,22 @@ bool HeavyContext::sendMessageToReceiver(hv_uint32_t receiverHash, double delayM
   const hv_uint32_t timestamp = blockStartTimestamp +
       (hv_uint32_t) (hv_max_d(0.0, delayMs)*(getSampleRate()/1000.0));
 
-  HV_SPINLOCK_ACQUIRE(msgLock);
+  ReceiverMessagePair *p = nullptr;
+  HV_SPINLOCK_ACQUIRE(inQueueLock);
   const hv_uint32_t numBytes = sizeof(ReceiverMessagePair) + msg_getSize(m) - sizeof(HvMessage);
-  ReceiverMessagePair *p = (ReceiverMessagePair *) hLp_getWriteBuffer(&msgPipe, numBytes);
+  p = (ReceiverMessagePair *) hLp_getWriteBuffer(&inQueue, numBytes);
   if (p != nullptr) {
     p->receiverHash = receiverHash;
     msg_copyToBuffer(m, (char *) &p->msg, msg_getSize(m));
     msg_setTimestamp(&p->msg, timestamp);
-    hLp_produce(&msgPipe, numBytes);
-    HV_SPINLOCK_RELEASE(msgLock);
-    return true;
+    hLp_produce(&inQueue, numBytes);
   } else {
-    HV_SPINLOCK_RELEASE(msgLock);
     hv_assert(false &&
-        "The message queue is full and cannot accept more messages until they "
-        "have been processed. Try increasing the queue size in the new_with_options() constructor.");
-    return false;
+        "::sendMessageToReceiver - The input message queue is full and cannot accept more messages until they "
+        "have been processed. Try increasing the inQueueKb size in the new_with_options() constructor.");
   }
+  HV_SPINLOCK_RELEASE(inQueueLock);
+  return (p != nullptr);
 }
 
 bool HeavyContext::cancelMessage(HvMessage *m, void (*sendMessage)(HeavyContextInterface *, int, const HvMessage *)) {
@@ -147,15 +170,77 @@ bool HeavyContext::setLengthForTable(hv_uint32_t tableHash, hv_uint32_t newSampl
 }
 
 void HeavyContext::lockAcquire() {
-  HV_SPINLOCK_ACQUIRE(msgLock);
+  HV_SPINLOCK_ACQUIRE(inQueueLock);
 }
 
 bool HeavyContext::lockTry() {
-  HV_SPINLOCK_TRY(msgLock);
+  HV_SPINLOCK_TRY(inQueueLock);
 }
 
 void HeavyContext::lockRelease() {
-  HV_SPINLOCK_RELEASE(msgLock);
+  HV_SPINLOCK_RELEASE(inQueueLock);
+}
+
+void HeavyContext::setInputMessageQueueSize(int inQueueKb) {
+  hv_assert(inQueueKb > 0);
+  hLp_free(&inQueue);
+  hLp_init(&inQueue, inQueueKb*1024);
+}
+
+void HeavyContext::setOutputMessageQueueSize(int outQueueKb) {
+  hv_assert(outQueueKb > 0);
+  hLp_free(&outQueue);
+  hLp_init(&outQueue, outQueueKb*1024);
+}
+
+bool HeavyContext::getNextSentMessage(hv_uint32_t *outSendHash, HvMessage *outMsg, int msgLength) {
+  *outSendHash = 0;
+  ReceiverMessagePair *p = nullptr;
+  hv_assert((sendHook == &defaultSendHook) &&
+      "::getNextSentMessage - this function won't do anything if the msg outQueue "
+      "size is 0, or you've overriden the default sendhook.");
+  if (sendHook == &defaultSendHook) {
+    HV_SPINLOCK_ACQUIRE(outQueueLock);
+    if (hLp_hasData(&outQueue)) {
+      hv_uint32_t numBytes = 0;
+      p = reinterpret_cast<ReceiverMessagePair *>(hLp_getReadBuffer(&outQueue, &numBytes));
+      hv_assert((p != nullptr) && "::getNextSentMessage - something bad happened.");
+      hv_assert(numBytes >= sizeof(ReceiverMessagePair));
+      hv_assert((numBytes <= msgLength) &&
+          "::getNextSentMessage - the sent message is bigger than the message "
+          "passed to handle it.");
+      *outSendHash = p->receiverHash;
+      hv_memcpy(outMsg, &p->msg, numBytes);
+      hLp_consume(&outQueue);
+    }
+    HV_SPINLOCK_RELEASE(outQueueLock);
+  }
+  return (p != nullptr);
+}
+
+bool HeavyContext::getNextSentBangMessage(hv_uint32_t *outSendHash) {
+  *outSendHash = 0;
+  ReceiverMessagePair *p = nullptr;
+  hv_assert((sendHook == &defaultSendHook) &&
+      "::getNextSentMessage - this function won't do anything if the msg outQueue "
+      "size is 0, or you've overriden the default sendhook.");
+  if (sendHook == &defaultSendHook) {
+    HV_SPINLOCK_ACQUIRE(outQueueLock);
+    if (hLp_hasData(&outQueue)) {
+      hv_uint32_t numBytes = 0;
+      p = reinterpret_cast<ReceiverMessagePair *>(hLp_getReadBuffer(&outQueue, &numBytes));
+      hv_assert((p != nullptr) && "::getNextSentMessage - something bad happened.");
+      hv_assert(numBytes >= sizeof(ReceiverMessagePair));
+      if (hv_msg_isBang(&p->msg, 0)) {
+        *outSendHash = p->receiverHash;
+      } else {
+        p = nullptr; // wasn't a bang
+      }
+      hLp_consume(&outQueue);
+    }
+    HV_SPINLOCK_RELEASE(outQueueLock);
+  }
+  return (p != nullptr);
 }
 
 hv_uint32_t HeavyContext::getHashForString(const char *str) {

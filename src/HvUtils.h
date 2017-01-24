@@ -33,6 +33,10 @@
   #warning Could not detect platform. Assuming Unix-like.
 #endif
 
+#ifdef EMSCRIPTEN
+#define HV_EMSCRIPTEN 1
+#endif
+
 // basic includes
 #include <stdarg.h>
 #include <stdio.h>
@@ -245,7 +249,11 @@ static inline hv_int32_t __hv_utils_min_i(hv_int32_t x, hv_int32_t y) { return (
 #define hv_floor_f(a) floorf(a)
 #define hv_round_f(a) roundf(a)
 #define hv_pow_f(a, b) powf(a, b)
-#define hv_fma_f(a, b, c) ((a*b)+c) // TODO(joe): use 'fmaf(a, b, c)' once emscripten supports it
+#if HV_EMSCRIPTEN
+#define hv_fma_f(a, b, c) ((a*b)+c) // emscripten does not support fmaf (yet?)
+#else
+#define hv_fma_f(a, b, c) fmaf(a, b, c)
+#endif
 #if HV_MSVC
   // finds ceil(log2(x))
   #include <intrin.h>

@@ -27,7 +27,7 @@ struct HvTable;
 class HeavyContext : public HeavyContextInterface {
 
  public:
-  HeavyContext(double sampleRate, int poolKb=10, int queueKb=2);
+  HeavyContext(double sampleRate, int poolKb=10, int inQueueKb=2, int outQueueKb=0);
   virtual ~HeavyContext();
 
   int getSize() override { return (int) numBytes; }
@@ -66,6 +66,12 @@ class HeavyContext : public HeavyContextInterface {
   bool lockTry() override;
   void lockRelease() override;
 
+  // message queue management
+  void setInputMessageQueueSize(int inQueueKb) override;
+  void setOutputMessageQueueSize(int outQueueKb) override;
+  bool getNextSentMessage(hv_uint32_t *outSendHash, HvMessage *outMsg, int msgLength) override;
+  bool getNextSentBangMessage(hv_uint32_t *outSendHash) override;
+
   // utility functions
   static unsigned int getHashForString(const char *str);
 
@@ -83,16 +89,20 @@ class HeavyContext : public HeavyContextInterface {
       void (*sendMessage)(HeavyContextInterface *, int, const HvMessage *),
       int);
 
+  friend void defaultSendHook(HeavyContextInterface *, const char *, hv_uint32_t, const HvMessage *);
+
   // object state
   double sampleRate;
   hv_uint32_t blockStartTimestamp;
   hv_size_t numBytes;
   HvMessageQueue mq;
-  HvLightPipe msgPipe;
-  hv_atomic_bool msgLock;
   HvSendHook_t *sendHook;
   HvPrintHook_t *printHook;
   void *userData;
+  HvLightPipe inQueue;
+  HvLightPipe outQueue;
+  hv_atomic_bool inQueueLock;
+  hv_atomic_bool outQueueLock;
 };
 
 #endif // _HEAVY_CONTEXT_H_

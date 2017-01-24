@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014,2015,2016 Enzien Audio Ltd.
+ * Copyright (c) 2014-2017 Enzien Audio Ltd.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,7 +27,7 @@ typedef struct ControlPack {
   HvMessage *msg;
 } ControlPack;
 
-hv_size_t cPack_init(ControlPack *o, int n);
+hv_size_t cPack_init(ControlPack *o, int nargs, ...);
 
 void cPack_free(ControlPack *o);
 

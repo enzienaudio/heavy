@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014,2015,2016 Enzien Audio Ltd.
+ * Copyright (c) 2014-2017 Enzien Audio Ltd.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,14 +16,19 @@
 
 #include "HvControlPack.h"
 
-hv_size_t cPack_init(ControlPack *o, int n) {
-  hv_size_t numBytes = msg_getCoreSize(n);
+hv_size_t cPack_init(ControlPack *o, int nargs, ...) {
+  hv_size_t numBytes = msg_getCoreSize(nargs);
   o->msg = (HvMessage *) hv_malloc(numBytes);
   hv_assert(o->msg != NULL);
-  msg_init(o->msg, n, 0);
-  for (int i = 0; i < n; ++i) {
-    msg_setFloat(o->msg, i, 0.0f);
+  msg_init(o->msg, nargs, 0);
+
+  // variable arguments are used as float initialisers for the pack elements
+  va_list ap;
+  va_start(ap, nargs);
+  for (int i = 0; i < nargs; ++i) {
+    msg_setFloat(o->msg, i, (float) va_arg(ap, double));
   }
+  va_end(ap);
   return numBytes;
 }
 

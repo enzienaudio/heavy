@@ -44,14 +44,17 @@
 #define HLP_GET_UINT32_AT_BUFFER(a) (*((hv_uint32_t *) (a)))
 
 hv_uint32_t hLp_init(HvLightPipe *q, hv_uint32_t numBytes) {
-  hv_assert(numBytes > 0);
-  q->buffer = (char *) hv_malloc(numBytes);
-  hv_assert(q->buffer != NULL);
+  if (numBytes > 0) {
+    q->buffer = (char *) hv_malloc(numBytes);
+    hv_assert(q->buffer != NULL);
+    HLP_SET_UINT32_AT_BUFFER(q->buffer, HLP_STOP);
+  } else {
+    q->buffer = NULL;
+  }
   q->writeHead = q->buffer;
   q->readHead = q->buffer;
   q->len = numBytes;
   q->remainingBytes = numBytes;
-  HLP_SET_UINT32_AT_BUFFER(q->buffer, HLP_STOP);
   return numBytes;
 }
 
