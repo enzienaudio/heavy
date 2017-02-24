@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014,2015,2016 Enzien Audio Ltd.
+ * Copyright (c) 2014-2017 Enzien Audio Ltd.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 typedef struct ControlRandom {
-  unsigned int state;
+  hv_uint32_t state;
 } ControlRandom;
 
 hv_size_t cRandom_init(ControlRandom *o, int seed);

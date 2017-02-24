@@ -112,7 +112,7 @@ bool msg_hasFormat(const HvMessage *m, const char *fmt) {
 bool msg_compareSymbol(const HvMessage *m, int i, const char *s) {
   switch (msg_getType(m,i)) {
     case HV_MSG_SYMBOL: return !hv_strcmp(msg_getSymbol(m, i), s);
-    case HV_MSG_HASH: return (msg_getHash(m,i) == msg_symbolToHash(s));
+    case HV_MSG_HASH: return (msg_getHash(m,i) == hv_string_to_hash(s));
     default: return false;
   }
 }
@@ -142,46 +142,6 @@ void msg_setElementToFrom(HvMessage *n, int i_n, const HvMessage *const m, int i
   }
 }
 
-hv_uint32_t msg_symbolToHash(const char *s) {
-  // this hash is based MurmurHash2
-  // http://en.wikipedia.org/wiki/MurmurHash
-  // https://sites.google.com/site/murmurhash/
-  static const hv_uint32_t n = 0x5bd1e995;
-  static const hv_int32_t r = 24;
-
-  if (s == NULL) return 0;
-
-  hv_uint32_t len = (hv_uint32_t) hv_strlen(s);
-  hv_uint32_t x = len; // seed (0) ^ len
-
-  while (len >= 4) {
-#if HV_EMSCRIPTEN
-    hv_uint32_t k = s[0] | (s[1] << 8) | (s[2] << 16) | (s[3] << 24);
-#else
-    hv_uint32_t k = *((hv_uint32_t *) s);
-#endif
-    k *= n;
-    k ^= (k >> r);
-    k *= n;
-    x *= n;
-    x ^= k;
-    s += 4; len -= 4;
-  }
-
-  switch (len) {
-    case 3: x ^= (s[2] << 16);
-    case 2: x ^= (s[1] << 8);
-    case 1: x ^= s[0]; x *= n;
-    default: break;
-  }
-
-  x ^= (x >> 13);
-  x *= n;
-  x ^= (x >> 15);
-
-  return x;
-}
-
 hv_uint32_t msg_getHash(const HvMessage *const m, int i) {
   hv_assert(i < msg_getNumElements(m)); // invalid index
   switch (msg_getType(m,i)) {
@@ -190,7 +150,7 @@ hv_uint32_t msg_getHash(const HvMessage *const m, int i) {
       float f = msg_getFloat(m,i);
       return *((hv_uint32_t *) &f);
     }
-    case HV_MSG_SYMBOL: return msg_symbolToHash(msg_getSymbol(m,i));
+    case HV_MSG_SYMBOL: return hv_string_to_hash(msg_getSymbol(m,i));
     case HV_MSG_HASH: return (&(m->elem)+i)->data.h;
     default: return 0;
   }

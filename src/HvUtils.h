@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014,2015,2016 Enzien Audio Ltd.
+ * Copyright (c) 2014-2017 Enzien Audio Ltd.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -127,9 +127,13 @@
 // Strings
 #include <string.h>
 #define hv_strlen(a) strlen(a)
-#define hv_strncpy(a, b, c) strncpy(a, b, c)
 #define hv_strcmp(a, b) strcmp(a, b)
 #define hv_snprintf(a, b, c, ...) snprintf(a, b, c, __VA_ARGS__)
+#if HV_WIN
+#define hv_strncpy(_dst, _src, _len) strncpy_s(_dst, _len, _src, _TRUNCATE)
+#else
+#define hv_strncpy(_dst, _src, _len) strncpy(_dst, _src, _len)
+#endif
 
 // Memory management
 #define hv_memcpy(a, b, c) memcpy(a, b, c)
@@ -205,6 +209,15 @@
 #else
 #define HV_EXPORT
 #define HV_FORCE_INLINE inline __attribute__((always_inline))
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+  // Returns a 32-bit hash of any string. Returns 0 if string is NULL.
+  hv_uint32_t hv_string_to_hash(const char *str);
+#ifdef __cplusplus
+}
 #endif
 
 // Math

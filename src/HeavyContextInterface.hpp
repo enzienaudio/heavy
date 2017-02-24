@@ -274,15 +274,13 @@ class HeavyContextInterface {
    * Get the next message in the outgoing queue, will also consume the message.
    * Returns false if there are no messages.
    *
-   * @param outSendHash  a hash of the name of the receiver the message was sent to.
+   * @param destinationHash  a hash of the name of the receiver the message was sent to.
    * @param outMsg  message pointer that is filled by the next message contents.
-   * @param msgLength  length of outMsg in bytes.
+   * @param msgLengthBytes  max length of outMsg in bytes.
    *
    * @return  True if there is a message in the outgoing queue.
   */
-  virtual bool getNextSentMessage(hv_uint32_t *outSendHash, HvMessage *outMsg, int msgLength) = 0;
-  
-  virtual bool getNextSentBangMessage(hv_uint32_t *outSendHash) = 0;
+  virtual bool getNextSentMessage(hv_uint32_t *destinationHash, HvMessage *outMsg, hv_size_t msgLengthBytes) = 0;
 
   /** Returns a 32-bit hash of any string. Returns 0 if string is NULL. */
   static hv_uint32_t getHashForString(const char *str);

@@ -24,10 +24,10 @@ extern "C" {
 #endif
 
 typedef enum ElementType {
-  HV_MSG_BANG,
-  HV_MSG_FLOAT,
-  HV_MSG_SYMBOL,
-  HV_MSG_HASH
+  HV_MSG_BANG = 0,
+  HV_MSG_FLOAT = 1,
+  HV_MSG_SYMBOL = 2,
+  HV_MSG_HASH = 3
 } ElementType;
 
 typedef struct Element {
@@ -140,9 +140,6 @@ static inline bool msg_isHash(const HvMessage *m, int index) {
 static inline bool msg_isHashLike(const HvMessage *m, int index) {
   return (index < msg_getNumElements(m)) ? ((msg_getType(m, index) == HV_MSG_HASH) || (msg_getType(m, index) == HV_MSG_SYMBOL)) : false;
 }
-
-/** Returns a 32-bit hash of the given string. */
-hv_uint32_t msg_symbolToHash(const char *s);
 
 /** Returns a 32-bit hash of the given element. */
 hv_uint32_t msg_getHash(const HvMessage *const m, int i);

@@ -101,10 +101,6 @@ HV_EXPORT bool hv_msg_isHash(const HvMessage *const m, int i) {
   return msg_isHash(m, i);
 }
 
-HV_EXPORT unsigned int hv_msg_stringToHash(const char *s) {
-  return msg_symbolToHash(s);
-}
-
 HV_EXPORT hv_uint32_t hv_msg_getHash(const HvMessage *const m, int i) {
   return msg_getHash(m, i);
 }
@@ -167,7 +163,7 @@ HV_EXPORT void hv_setSendHook(HeavyContextInterface *c, HvSendHook_t *f) {
 }
 
 HV_EXPORT hv_uint32_t hv_stringToHash(const char *s) {
-  return msg_symbolToHash(s);
+  return hv_string_to_hash(s);
 }
 
 HV_EXPORT bool hv_sendBangToReceiver(HeavyContextInterface *c, hv_uint32_t receiverHash) {
@@ -286,18 +282,12 @@ HV_EXPORT void hv_setOutputMessageQueueSize(HeavyContextInterface *c, hv_uint32_
   c->setOutputMessageQueueSize(outQueueKb);
 }
 
-HV_EXPORT bool hv_getNextSentMessage(HeavyContextInterface *c, hv_uint32_t *outSendHash, HvMessage *outMsg, hv_uint32_t msgLength) {
+HV_EXPORT bool hv_getNextSentMessage(HeavyContextInterface *c, hv_uint32_t *destinationHash, HvMessage *outMsg, hv_uint32_t msgLength) {
   hv_assert(c != nullptr);
+  hv_assert(destinationHash != nullptr);
   hv_assert(outMsg != nullptr);
-  return c->getNextSentMessage(outSendHash, outMsg, msgLength);
+  return c->getNextSentMessage(destinationHash, outMsg, msgLength);
 }
-
-HV_EXPORT bool hv_getNextSentBangMessage(HeavyContextInterface *c, hv_uint32_t *outSendHash) {
-  hv_assert(c != nullptr);
-  hv_assert(outSendHash != nullptr);
-  return c->getNextSentBangMessage(outSendHash);
-}
-
 
 
 #if !HV_WIN

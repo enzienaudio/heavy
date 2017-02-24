@@ -26,9 +26,15 @@ static float cBinop_perform_op(BinopType op, float f, float k) {
     case HV_BINOP_ADD: return f + k;
     case HV_BINOP_SUBTRACT: return f - k;
     case HV_BINOP_MULTIPLY: return f * k;
-    case HV_BINOP_DIVIDE: return (k != 0.0f) ? f / k : 0.0f;
-    case HV_BINOP_INT_DIV: return (float) ((int) f / (int) k);
-    case HV_BINOP_MOD_BIPOLAR: return (float) ((int) f % (int) k);
+    case HV_BINOP_DIVIDE: return (k != 0.0f) ? (f/k) : 0.0f;
+    case HV_BINOP_INT_DIV: {
+      const int ik = (int) k;
+      return (ik != 0) ? (float) (((int) f) / ik) : 0.0f;
+    }
+    case HV_BINOP_MOD_BIPOLAR: {
+      const int ik = (int) k;
+      return (ik != 0) ? (float) (((int) f) % ik) : 0.0f;
+    }
     case HV_BINOP_MOD_UNIPOLAR: {
       f = (k == 0.0f) ? 0.0f : (float) ((int) f % (int) k);
       return (f < 0.0f) ? f + hv_abs_f(k) : f;

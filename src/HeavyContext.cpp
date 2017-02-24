@@ -193,8 +193,8 @@ void HeavyContext::setOutputMessageQueueSize(int outQueueKb) {
   hLp_init(&outQueue, outQueueKb*1024);
 }
 
-bool HeavyContext::getNextSentMessage(hv_uint32_t *outSendHash, HvMessage *outMsg, int msgLength) {
-  *outSendHash = 0;
+bool HeavyContext::getNextSentMessage(hv_uint32_t *destinationHash, HvMessage *outMsg, hv_size_t msgLengthBytes) {
+  *destinationHash = 0;
   ReceiverMessagePair *p = nullptr;
   hv_assert((sendHook == &defaultSendHook) &&
       "::getNextSentMessage - this function won't do anything if the msg outQueue "
@@ -206,10 +206,10 @@ bool HeavyContext::getNextSentMessage(hv_uint32_t *outSendHash, HvMessage *outMs
       p = reinterpret_cast<ReceiverMessagePair *>(hLp_getReadBuffer(&outQueue, &numBytes));
       hv_assert((p != nullptr) && "::getNextSentMessage - something bad happened.");
       hv_assert(numBytes >= sizeof(ReceiverMessagePair));
-      hv_assert((numBytes <= msgLength) &&
+      hv_assert((numBytes <= msgLengthBytes) &&
           "::getNextSentMessage - the sent message is bigger than the message "
           "passed to handle it.");
-      *outSendHash = p->receiverHash;
+      *destinationHash = p->receiverHash;
       hv_memcpy(outMsg, &p->msg, numBytes);
       hLp_consume(&outQueue);
     }
@@ -218,36 +218,9 @@ bool HeavyContext::getNextSentMessage(hv_uint32_t *outSendHash, HvMessage *outMs
   return (p != nullptr);
 }
 
-bool HeavyContext::getNextSentBangMessage(hv_uint32_t *outSendHash) {
-  *outSendHash = 0;
-  ReceiverMessagePair *p = nullptr;
-  hv_assert((sendHook == &defaultSendHook) &&
-      "::getNextSentMessage - this function won't do anything if the msg outQueue "
-      "size is 0, or you've overriden the default sendhook.");
-  if (sendHook == &defaultSendHook) {
-    HV_SPINLOCK_ACQUIRE(outQueueLock);
-    if (hLp_hasData(&outQueue)) {
-      hv_uint32_t numBytes = 0;
-      p = reinterpret_cast<ReceiverMessagePair *>(hLp_getReadBuffer(&outQueue, &numBytes));
-      hv_assert((p != nullptr) && "::getNextSentMessage - something bad happened.");
-      hv_assert(numBytes >= sizeof(ReceiverMessagePair));
-      if (hv_msg_isBang(&p->msg, 0)) {
-        *outSendHash = p->receiverHash;
-      } else {
-        p = nullptr; // wasn't a bang
-      }
-      hLp_consume(&outQueue);
-    }
-    HV_SPINLOCK_RELEASE(outQueueLock);
-  }
-  return (p != nullptr);
-}
-
 hv_uint32_t HeavyContext::getHashForString(const char *str) {
-  return msg_symbolToHash(str);
+  return hv_string_to_hash(str);
 }
-
-
 
 HvTable *_hv_table_get(HeavyContextInterface *c, hv_uint32_t tableHash) {
   hv_assert(c != nullptr);

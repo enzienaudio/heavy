@@ -69,11 +69,10 @@ class HeavyContext : public HeavyContextInterface {
   // message queue management
   void setInputMessageQueueSize(int inQueueKb) override;
   void setOutputMessageQueueSize(int outQueueKb) override;
-  bool getNextSentMessage(hv_uint32_t *outSendHash, HvMessage *outMsg, int msgLength) override;
-  bool getNextSentBangMessage(hv_uint32_t *outSendHash) override;
+  bool getNextSentMessage(hv_uint32_t *destinationHash, HvMessage *outMsg, hv_size_t msgLength) override;
 
   // utility functions
-  static unsigned int getHashForString(const char *str);
+  static hv_uint32_t getHashForString(const char *str);
 
  protected:
   virtual HvTable *getTableForHash(hv_uint32_t tableHash) = 0;

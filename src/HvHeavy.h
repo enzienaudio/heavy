@@ -294,15 +294,13 @@ void hv_setOutputMessageQueueSize(HeavyContextInterface *c, hv_uint32_t outQueue
  * Returns false if there are no messages.
  *
  * @param c  A Heavy context.
- * @param outSendHash  a hash of the name of the receiver the message was sent to.
+ * @param destinationHash  a hash of the name of the receiver the message was sent to.
  * @param outMsg  message pointer that is filled by the next message contents.
  * @param msgLength  length of outMsg in bytes.
  *
  * @return  True if there is a message in the outgoing queue.
 */
-bool hv_getNextSentMessage(HeavyContextInterface *c, hv_uint32_t *outSendHash, HvMessage *outMsg, hv_uint32_t msgLength);
-
-bool hv_getNextSentBangMessage(hv_uint32_t *outSendHash);
+bool hv_getNextSentMessage(HeavyContextInterface *c, hv_uint32_t *destinationHash, HvMessage *outMsg, hv_uint32_t msgLength);
 
 
 

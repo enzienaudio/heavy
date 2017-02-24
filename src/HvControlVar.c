@@ -24,7 +24,7 @@ hv_size_t cVar_init_f(ControlVar *o, float k) {
 
 hv_size_t cVar_init_s(ControlVar *o, const char *s) {
   o->e.type = HV_MSG_HASH;
-  o->e.data.h = msg_symbolToHash(s);
+  o->e.data.h = hv_string_to_hash(s);
   return 0;
 }
 
