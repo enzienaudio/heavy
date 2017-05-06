@@ -37,8 +37,8 @@ void cUnop_onMessage(HeavyContextInterface *_c, UnopType op, const HvMessage *m,
       case HV_UNOP_ABS: f = hv_abs_f(f); break;
       case HV_UNOP_SQRT: f = (f > 0.0f) ? hv_sqrt_f(f) : 0.0f; break;
       case HV_UNOP_LOG: f = (f > 0.0f) ? hv_log_f(f) : 0.0f; break;
-      case HV_UNOP_LOG2: f = (f > 0.0f) ? hv_log2_f(f) : 0.0f; break;
-      case HV_UNOP_LOG10: f = (f > 0.0f) ? hv_log10_f(f) : 0.0f; break;
+      case HV_UNOP_LOG2: f = (f > 0.0f) ? (1.442695040888963f*hv_log_f(f)) : 0.0f; break;
+      case HV_UNOP_LOG10: f = (f > 0.0f) ? (0.434294481903252f*hv_log_f(f)) : 0.0f; break;
       case HV_UNOP_CEIL: f = hv_ceil_f(f); break;
       case HV_UNOP_FLOOR: f = hv_floor_f(f); break;
       case HV_UNOP_ROUND: f = hv_round_f(f); break;

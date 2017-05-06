@@ -71,39 +71,32 @@ static inline void __hv_store_f(float *bOut, hv_bInf_t bIn) {
 #endif
 }
 
-static inline void __hv_log_f(hv_bInf_t bIn, hv_bOutf_t bOut) {
-#if HV_SIMD_AVX
-  hv_assert(0); // __hv_log_f() not implemented
-#elif HV_SIMD_SSE
-  hv_assert(0); // __hv_log_f() not implemented
-#elif HV_SIMD_NEON
-  hv_assert(0); // __hv_log_f() not implemented
-#else // HV_SIMD_NONE
-  *bOut = (bIn > 0.0f) ? hv_log_f(bIn) : 0.0f;
-#endif
-}
-
-static inline void __hv_log10_f(hv_bInf_t bIn, hv_bOutf_t bOut) {
-#if HV_SIMD_AVX
-  hv_assert(0); // __hv_log10_f() not implemented
-#elif HV_SIMD_SSE
-  hv_assert(0); // __hv_log10_f() not implemented
-#elif HV_SIMD_NEON
-  hv_assert(0); // __hv_log10_f() not implemented
-#else // HV_SIMD_NONE
-  *bOut = (bIn > 0.0f) ? hv_log10_f(bIn) : 0.0f;
-#endif
-}
-
 static inline void __hv_log2_f(hv_bInf_t bIn, hv_bOutf_t bOut) {
 #if HV_SIMD_AVX
   hv_assert(0); // __hv_log2_f() not implemented
 #elif HV_SIMD_SSE
-  hv_assert(0); // __hv_log2_f() not implemented
+  // https://en.wikipedia.org/wiki/Fast_inverse_square_root
+  __m128i a = _mm_castps_si128(bIn);
+  __m128i b = _mm_srli_epi32(a, 23);
+  __m128i c = _mm_sub_epi32(b, _mm_set1_epi32(127)); // exponent (int)
+  __m128 d = _mm_cvtepi32_ps(c); // exponent (float)
+  __m128i e = _mm_or_si128(_mm_andnot_si128(_mm_set1_epi32(0xFF800000), a), _mm_set1_epi32(0x3F800000));
+  __m128 f = _mm_castsi128_ps(e); // 1+m (float)
+  __m128 g = _mm_add_ps(d, f); // e + 1 + m
+  __m128 h = _mm_add_ps(g, _mm_set1_ps(-0.9569643f)); // e + 1 + m + (sigma-1)
+  *bOut = h;
 #elif HV_SIMD_NEON
-  hv_assert(0); // __hv_log2_f() not implemented
+  int32x4_t a = vreinterpretq_s32_f32(bIn);
+  int32x4_t b = vshrq_n_s32(a, 23);
+  int32x4_t c = vsubq_s32(b, vdupq_n_s32(127));
+  float32x4_t d = vcvtq_f32_s32(c);
+  int32x4_t e = vorrq_s32(vbicq_s32(a, vdupq_n_s32(0xFF800000)), vdupq_n_s32(0x3F800000));
+  float32x4_t f = vreinterpretq_f32_s32(e);
+  float32x4_t g = vaddq_f32(d, f);
+  float32x4_t h = vaddq_f32(g, vdupq_n_f32(-0.9569643f));
+  *bOut = h;
 #else // HV_SIMD_NONE
-  *bOut = (bIn > 0.0f) ? hv_log2_f(bIn) : 0.0f;
+  *bOut = 1.442695040888963f * hv_log_f(bIn);
 #endif
 }
 
@@ -316,13 +309,25 @@ static inline void __hv_neg_f(hv_bInf_t bIn, hv_bOutf_t bOut) {
 #endif
 }
 
+// https://en.wikipedia.org/wiki/Exponential_function
+// https://codingforspeed.com/using-faster-exponential-approximation/
 static inline void __hv_exp_f(hv_bInf_t bIn, hv_bOutf_t bOut) {
 #if HV_SIMD_AVX
-  hv_assert(0); // __hv_exp_f() not implemented
+  float *const b = (float *) hv_alloca(HV_N_SIMD*sizeof(float));
+  _mm256_store_ps(b, bIn);
+  *bOut = _mm256_set_ps(
+      hv_exp_f(b[7]), hv_exp_f(b[6]), hv_exp_f(b[5]), hv_exp_f(b[4]),
+      hv_exp_f(b[3]), hv_exp_f(b[2]), hv_exp_f(b[1]), hv_exp_f(b[0]));
 #elif HV_SIMD_SSE
-  hv_assert(0); // __hv_exp_f() not implemented
+  float *const b = (float *) hv_alloca(HV_N_SIMD*sizeof(float));
+  _mm_store_ps(b, bIn);
+  *bOut = _mm_set_ps(hv_exp_f(b[3]), hv_exp_f(b[2]), hv_exp_f(b[1]), hv_exp_f(b[0]));
 #elif HV_SIMD_NEON
-  hv_assert(0); // __hv_exp_f() not implemented
+  *bOut = (float32x4_t) {
+    hv_exp_f(bIn[0]),
+    hv_exp_f(bIn[1]),
+    hv_exp_f(bIn[2]),
+    hv_exp_f(bIn[3])};
 #else // HV_SIMD_NONE
   *bOut = hv_exp_f(bIn);
 #endif
@@ -531,23 +536,27 @@ static inline void __hv_max_i(hv_bIni_t bIn0, hv_bIni_t bIn1, hv_bOuti_t bOut) {
 
 static inline void __hv_pow_f(hv_bInf_t bIn0, hv_bInf_t bIn1, hv_bOutf_t bOut) {
 #if HV_SIMD_AVX
+  float *b = (float *) hv_alloca(16*sizeof(float));
+  _mm256_store_ps(b, bIn0);
+  _mm256_store_ps(b+8, bIn0);
   *bOut = _mm256_set_ps(
-      hv_pow_f(bIn0[7], bIn1[7]),
-      hv_pow_f(bIn0[6], bIn1[6]),
-      hv_pow_f(bIn0[5], bIn1[5]),
-      hv_pow_f(bIn0[4], bIn1[4]),
-      hv_pow_f(bIn0[3], bIn1[3]),
-      hv_pow_f(bIn0[2], bIn1[2]),
-      hv_pow_f(bIn0[1], bIn1[1]),
-      hv_pow_f(bIn0[0], bIn1[0]));
+      hv_pow_f(b[7], b[7]),
+      hv_pow_f(b[6], b[6]),
+      hv_pow_f(b[5], b[5]),
+      hv_pow_f(b[4], b[4]),
+      hv_pow_f(b[3], b[3]),
+      hv_pow_f(b[2], b[2]),
+      hv_pow_f(b[1], b[1]),
+      hv_pow_f(b[0], b[0]));
 #elif HV_SIMD_SSE
-  const float *const b0 = (float *) &bIn0;
-  const float *const b1 = (float *) &bIn1;
+  float *b = (float *) hv_alloca(8*sizeof(float));
+  _mm_store_ps(b, bIn0);
+  _mm_store_ps(b+4, bIn0);
   *bOut = _mm_set_ps(
-      hv_pow_f(b0[3], b1[3]),
-      hv_pow_f(b0[2], b1[2]),
-      hv_pow_f(b0[1], b1[1]),
-      hv_pow_f(b0[0], b1[0]));
+      hv_pow_f(b[3], b[7]),
+      hv_pow_f(b[2], b[6]),
+      hv_pow_f(b[1], b[5]),
+      hv_pow_f(b[0], b[5]));
 #elif HV_SIMD_NEON
   *bOut = (float32x4_t) {
       hv_pow_f(bIn0[0], bIn1[0]),
@@ -619,15 +628,18 @@ static inline void __hv_neq_f(hv_bInf_t bIn0, hv_bInf_t bIn1, hv_bOutf_t bOut) {
 #endif
 }
 
-static inline void __hv_xor_f(hv_bInf_t bIn0, hv_bInf_t bIn1, hv_bOutf_t bOut) {
+static inline void __hv_or_f(hv_bInf_t bIn0, hv_bInf_t bIn1, hv_bOutf_t bOut) {
 #if HV_SIMD_AVX
-  hv_assert(0); // __hv_xor_f() not implemented
+  *bOut = _mm256_or_ps(bIn1, bIn0);
 #elif HV_SIMD_SSE
-  hv_assert(0); // __hv_xor_f() not implemented
+  *bOut = _mm_or_ps(bIn1, bIn0);
 #elif HV_SIMD_NEON
-  hv_assert(0); // __hv_xor_f() not implemented
+  *bOut = vreinterpretq_f32_u32(vorrq_u32(vreinterpretq_u32_f32(bIn1), vreinterpretq_u32_f32(bIn0)));
 #else // HV_SIMD_NONE
-  *bOut = (float) (((int) bIn0) ^ ((int) bIn1));
+  if (bIn0 == 0.0f && bIn1 == 0.0f) *bOut = 0.0f;
+  else if (bIn0 == 0.0f) *bOut = bIn1;
+  else if (bIn1 == 0.0f) *bOut = bIn0;
+  else hv_assert(0);
 #endif
 }
 
@@ -642,7 +654,19 @@ static inline void __hv_and_f(hv_bInf_t bIn0, hv_bInf_t bIn1, hv_bOutf_t bOut) {
   if (bIn0 == 0.0f || bIn1 == 0.0f) *bOut = 0.0f;
   else if (bIn0 == 1.0f) *bOut = bIn1;
   else if (bIn1 == 1.0f) *bOut = bIn0;
-  else hv_assert(0); // NOTE(mhroth): floating point & is pretty much a bad idea, only used for if~
+  else hv_assert(0);
+#endif
+}
+
+static inline void __hv_andnot_f(hv_bInf_t bIn0_mask, hv_bInf_t bIn1, hv_bOutf_t bOut) {
+#if HV_SIMD_AVX
+  *bOut = _mm256_andnot_ps(bIn0_mask, bIn1);
+#elif HV_SIMD_SSE
+  *bOut = _mm_andnot_ps(bIn0_mask, bIn1);
+#elif HV_SIMD_NEON
+  *bOut = vreinterpretq_f32_s32(vbicq_s32(vreinterpretq_s32_f32(bIn1), vreinterpretq_s32_f32(bIn0_mask)));
+#else // HV_SIMD_NONE
+  *bOut = (bIn0_mask == 0.0f) ? bIn1 : 0.0f;
 #endif
 }
 
@@ -669,6 +693,32 @@ static inline void __hv_fma_f(hv_bInf_t bIn0, hv_bInf_t bIn1, hv_bInf_t bIn2, hv
 #endif
 #else // HV_SIMD_NONE
   *bOut = hv_fma_f(bIn0, bIn1, bIn2);
+#endif
+}
+
+// bOut = (bIn0 * bIn1) - bIn2
+static inline void __hv_fms_f(hv_bInf_t bIn0, hv_bInf_t bIn1, hv_bInf_t bIn2, hv_bOutf_t bOut) {
+#if HV_SIMD_AVX
+#if HV_SIMD_FMA
+  *bOut = _mm256_fmsub_ps(bIn0, bIn1, bIn2);
+#else
+  *bOut = _mm256_sub_ps(_mm256_mul_ps(bIn0, bIn1), bIn2);
+#endif // HV_SIMD_FMA
+#elif HV_SIMD_SSE
+#if HV_SIMD_FMA
+  *bOut = _mm_fmsub_ps(bIn0, bIn1, bIn2);
+#else
+  *bOut = _mm_sub_ps(_mm_mul_ps(bIn0, bIn1), bIn2);
+#endif // HV_SIMD_FMA
+#elif HV_SIMD_NEON
+#if __ARM_ARCH >= 8
+  *bOut = vfmsq_f32(bIn2, bIn0, bIn1);
+#else
+  // NOTE(mhroth): it turns out, fma SUUUUCKS on lesser ARM architectures
+  *bOut = vsubq_f32(vmulq_f32(bIn0, bIn1), bIn2);
+#endif
+#else // HV_SIMD_NONE
+  *bOut = (bIn0 * bIn1) - bIn2;
 #endif
 }
 

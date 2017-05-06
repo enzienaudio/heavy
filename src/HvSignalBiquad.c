@@ -131,7 +131,7 @@ void __hv_biquad_f(SignalBiquad *o, hv_bInf_t bIn, hv_bInf_t bX0, hv_bInf_t bX1,
 }
 
 static void sBiquad_k_updateCoefficients(SignalBiquad_k *const o) {
-#if 0
+#if DEBUG
   // inspect the filter coefficients to ensure that the filter is stable
   // 1/((1-a*z^-1) * (1-b*z^-1))
   float k = (o->a1*o->a1) - (4.0f*o->a2);

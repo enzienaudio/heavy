@@ -30,7 +30,7 @@ hv_uint32_t hv_string_to_hash(const char *str) {
 
   while (len >= 4) {
 #if HV_EMSCRIPTEN
-    hv_uint32_t k = s[0] | (s[1] << 8) | (s[2] << 16) | (s[3] << 24);
+    hv_uint32_t k = str[0] | (str[1] << 8) | (str[2] << 16) | (str[3] << 24);
 #else
     hv_uint32_t k = *((hv_uint32_t *) str);
 #endif

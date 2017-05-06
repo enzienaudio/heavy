@@ -66,7 +66,7 @@ static void sEnv_sendMessage(HeavyContextInterface *_c, SignalEnvelope *o, float
     void (*sendMessage)(HeavyContextInterface *, int, const HvMessage *)) {
   // finish RMS calculation. sqrt is removed as it can be combined with the log operation.
   // result is normalised such that 1 RMS == 100 dB
-  rms = 10.0f * hv_log10_f(rms) + 100.0f;
+  rms = (4.342944819032518f * hv_log_f(rms)) + 100.0f;
 
   // prepare the outgoing message. Schedule it at the beginning of the next block.
   HvMessage *const m = HV_MESSAGE_ON_STACK(1);

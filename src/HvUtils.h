@@ -251,13 +251,6 @@ static inline hv_int32_t __hv_utils_min_i(hv_int32_t x, hv_int32_t y) { return (
 #define hv_abs_f(a) fabsf(a)
 #define hv_sqrt_f(a) sqrtf(a)
 #define hv_log_f(a) logf(a)
-#if HV_ANDROID
-  // NOTE(mhroth): for whatever silly reason, log2f is not defined!
-  #define hv_log2_f(a) (1.44269504088896f*logf(a))
-#else
-  #define hv_log2_f(a) log2f(a)
-#endif // HV_ANDROID
-#define hv_log10_f(a) log10f(a)
 #define hv_ceil_f(a) ceilf(a)
 #define hv_floor_f(a) floorf(a)
 #define hv_round_f(a) roundf(a)
