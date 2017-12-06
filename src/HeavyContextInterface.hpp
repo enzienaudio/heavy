@@ -26,8 +26,10 @@ class HeavyContextInterface;
 struct HvMessage;
 
 typedef enum {
-  HV_PARAM_TYPE_PARAMETER,
-  HV_PARAM_TYPE_EVENT
+  HV_PARAM_TYPE_PARAMETER_IN,
+  HV_PARAM_TYPE_PARAMETER_OUT,
+  HV_PARAM_TYPE_EVENT_IN,
+  HV_PARAM_TYPE_EVENT_OUT
 } HvParameterType;
 
 typedef struct HvParameterInfo {
